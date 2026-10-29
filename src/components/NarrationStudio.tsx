@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Sparkles, Volume2, Edit3, AlertCircle, PenLine, Lightbulb } from 'lucide-react';
-import { LiveAudioRecorder } from '../utils/audio';
+import { LiveAudioRecorder, transcribeAudioWithServer } from '../utils/audio';
 import { Theme, AgeGroup } from '../types';
 
 interface NarrationStudioProps {
@@ -39,6 +39,7 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
 }) => {
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [audioPayload, setAudioPayload] = useState<{ base64: string; mime: string } | null>(null);
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -58,22 +59,45 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
 
   const toggleRecording = async () => {
     if (isRecording) {
+      setIsRecording(false);
+      setVolumeLevel(0);
       if (recorderRef.current) {
         try {
           const result = await recorderRef.current.stop();
-          setAudioPayload(result.base64Audio ? { base64: result.base64Audio, mime: result.mimeType } : null);
+          if (result.base64Audio) {
+            setAudioPayload({ base64: result.base64Audio, mime: result.mimeType });
+
+            // If Web Speech API produced no transcript (or very short/empty),
+            // immediately transcribe via Gemini server endpoint
+            const currentLiveText = transcript.trim();
+            if (!currentLiveText) {
+              setIsTranscribing(true);
+              setErrorMessage(null);
+              try {
+                const aiText = await transcribeAudioWithServer(result.base64Audio, result.mimeType);
+                if (aiText) {
+                  setTranscript(aiText);
+                } else {
+                  setErrorMessage('No clear words detected in audio. Please try speaking closer or type below.');
+                }
+              } catch (txErr) {
+                console.warn('AI transcribe error:', txErr);
+              } finally {
+                setIsTranscribing(false);
+              }
+            }
+          }
         } catch (e) {
           console.error('Stop recording error:', e);
         }
       }
-      setIsRecording(false);
-      setVolumeLevel(0);
     } else {
       setErrorMessage(null);
       try {
         const recorder = new LiveAudioRecorder();
         recorderRef.current = recorder;
-        await recorder.start({
+        const started = await recorder.start({
+          initialText: transcript.trim(),
           onTranscript: (liveText: string) => {
             setTranscript(liveText);
           },
@@ -81,11 +105,16 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
             setVolumeLevel(vol);
           },
           onError: (err: Error) => {
-            setErrorMessage(err.message);
-            setIsRecording(false);
+            console.warn('Audio recorder error callback:', err);
+            if (!recorder.isRecording) {
+              setErrorMessage(err.message || 'Microphone error. You can type directly.');
+              setIsRecording(false);
+            }
           },
         });
-        setIsRecording(true);
+        if (started) {
+          setIsRecording(true);
+        }
       } catch (err: any) {
         console.error('Microphone start error:', err);
         setErrorMessage(
@@ -93,6 +122,24 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
         );
         setIsRecording(false);
       }
+    }
+  };
+
+  const handleTranscribeAudioWithAI = async () => {
+    if (!audioPayload?.base64 || isTranscribing) return;
+    setIsTranscribing(true);
+    setErrorMessage(null);
+    try {
+      const aiText = await transcribeAudioWithServer(audioPayload.base64, audioPayload.mime);
+      if (aiText) {
+        setTranscript(aiText);
+      } else {
+        setErrorMessage('Could not detect clear words. Please try recording again or edit text directly.');
+      }
+    } catch (e) {
+      console.warn('Manual transcribe error:', e);
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -248,16 +295,29 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
                 <Volume2 className="w-3.5 h-3.5 text-[var(--accent)]" />
                 Spoken Words
               </label>
-              {transcript && !isRecording && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTranscript(!isEditingTranscript)}
-                  className="min-h-[44px] px-2.5 py-1 text-xs text-[var(--ink-2)] hover:text-[var(--accent)] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>{isEditingTranscript ? 'Done Editing' : 'Edit Words'}</span>
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {audioPayload && !isRecording && !isTranscribing && (
+                  <button
+                    type="button"
+                    onClick={handleTranscribeAudioWithAI}
+                    className="min-h-[44px] px-2.5 py-1 text-xs text-[var(--ink-2)] hover:text-[var(--accent)] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Transcribe recorded audio with Gemini AI"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    <span>AI Transcribe</span>
+                  </button>
+                )}
+                {transcript && !isRecording && !isTranscribing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTranscript(!isEditingTranscript)}
+                    className="min-h-[44px] px-2.5 py-1 text-xs text-[var(--ink-2)] hover:text-[var(--accent)] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{isEditingTranscript ? 'Done Editing' : 'Edit Words'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {isEditingTranscript ? (
@@ -274,9 +334,9 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
                 role="button"
                 tabIndex={0}
                 aria-label="Edit spoken narration"
-                onClick={() => !isRecording && setIsEditingTranscript(true)}
+                onClick={() => !isRecording && !isTranscribing && setIsEditingTranscript(true)}
                 onKeyDown={(e) => {
-                  if ((e.key === 'Enter' || e.key === ' ') && !isRecording) {
+                  if ((e.key === 'Enter' || e.key === ' ') && !isRecording && !isTranscribing) {
                     e.preventDefault();
                     setIsEditingTranscript(true);
                   }
@@ -287,7 +347,12 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
                     : 'bg-[var(--paper-2)]/50 border-dashed border-[var(--rule)] text-[var(--ink-3)]'
                 }`}
               >
-                {transcript ? (
+                {isTranscribing ? (
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-[var(--accent)] font-medium py-2">
+                    <Sparkles className="w-4 h-4 animate-spin text-[var(--accent)]" />
+                    <span>Transcribing your narration with Gemini AI...</span>
+                  </div>
+                ) : transcript ? (
                   <p className="font-serif text-sm sm:text-base leading-relaxed text-[var(--ink)]">
                     "{transcript}"
                   </p>
@@ -375,7 +440,7 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
         <button
           type="button"
           onClick={handleCreatePage}
-          disabled={(!transcript.trim() && !audioPayload) || isRecording || isGenerating}
+          disabled={(!transcript.trim() && !audioPayload) || isRecording || isGenerating || isTranscribing}
           className="btn-accent w-full sm:flex-1 min-h-[44px] py-3 px-5 rounded-full font-semibold text-xs sm:text-sm bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shadow-xs flex items-center justify-center gap-2 cursor-pointer"
         >
           {isGenerating ? (

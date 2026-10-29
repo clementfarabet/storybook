@@ -143,7 +143,7 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
   }
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto">
+    <div className="space-y-4 w-full max-w-[1420px] mx-auto">
       {/* Top page status bar */}
       <div className="flex items-center justify-between px-2 text-xs text-[var(--ink-3)] font-mono">
         <span>
@@ -204,12 +204,12 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
       </div>
 
       {/* Realistic Storybook Hardcover Spread */}
-      <div className="bg-[var(--paper)] rounded-2xl sm:rounded-3xl border border-[var(--rule)] shadow-lg overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[460px] sm:min-h-[520px]">
+      <div className="bg-[var(--paper)] rounded-2xl sm:rounded-3xl border border-[var(--rule)] shadow-2xl overflow-hidden w-full transition-shadow">
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[520px] sm:min-h-[580px] lg:min-h-[640px] xl:min-h-[700px]">
           {/* Left Spread: Illustration on Paper Ground with Gutter Shadow */}
-          <div className="relative bg-[var(--paper)] p-4 sm:p-8 flex items-center justify-center border-b lg:border-b-0 lg:border-r border-[var(--rule)] lg:shadow-[inset_-16px_0_24px_-16px_rgba(0,0,0,0.08)]">
+          <div className="relative bg-[var(--paper)] p-4 sm:p-8 lg:p-10 xl:p-12 flex items-center justify-center border-b lg:border-b-0 lg:border-r border-[var(--rule)] lg:shadow-[inset_-24px_0_32px_-16px_rgba(0,0,0,0.09)]">
             {currentPage?.imageData ? (
-              <div className="relative group w-full max-w-[420px] aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-xs border border-[var(--rule)] bg-[var(--paper)]">
+              <div className="relative group w-full max-w-[560px] xl:max-w-[620px] aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-md border border-[var(--rule)] bg-[var(--paper)]">
                 <img
                   src={currentPage.imageData}
                   alt={currentPage.pageTitle || 'Page Illustration'}
@@ -229,7 +229,7 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="w-full max-w-[400px] aspect-square rounded-2xl border-2 border-dashed border-[var(--rule)] flex flex-col items-center justify-center text-center p-6 text-[var(--ink-3)]">
+              <div className="w-full max-w-[560px] xl:max-w-[620px] aspect-square rounded-2xl border-2 border-dashed border-[var(--rule)] flex flex-col items-center justify-center text-center p-6 text-[var(--ink-3)]">
                 <Sparkles className="w-8 h-8 mb-2 opacity-50" />
                 <p className="text-xs mb-3">No illustration cached</p>
                 <button
@@ -246,7 +246,7 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
           </div>
 
           {/* Right Spread: Story Words on Paper Ground with Gutter Shadow */}
-          <div className="p-6 sm:p-10 flex flex-col justify-between space-y-6 bg-[var(--paper)] lg:shadow-[inset_16px_0_24px_-16px_rgba(0,0,0,0.08)]">
+          <div className="p-6 sm:p-10 lg:p-12 xl:p-14 flex flex-col justify-between space-y-6 bg-[var(--paper)] lg:shadow-[inset_24px_0_32px_-16px_rgba(0,0,0,0.09)]">
             <div className="space-y-4">
               {/* Chapter / Page Kicker */}
               <div className="flex items-center justify-between border-b border-[var(--rule)] pb-3">
@@ -287,9 +287,9 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="pt-2 sm:pt-4">
+                <div className="pt-2 sm:pt-4 max-w-2xl">
                   <p
-                    className={`font-serif text-[var(--ink)] tracking-normal ${currentAgeConfig.fontSizeClass}`}
+                    className={`font-serif text-[var(--ink)] tracking-normal leading-relaxed ${currentAgeConfig.fontSizeClass}`}
                     style={{ fontFeatureSettings: '"pnum", "onum"' }}
                   >
                     {currentPage?.storyText}
@@ -318,11 +318,11 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
                 <button
                   type="button"
                   onClick={onOpenNarrationStudio}
-                  className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 transition-opacity text-xs font-medium flex items-center gap-1.5 shadow-xs"
+                  className="btn-accent min-h-[44px] px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 transition-opacity text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer"
                   title="Narrate next page"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Next Page</span>
+                  <Plus className="w-4 h-4 text-[var(--accent-contrast)]" />
+                  <span className="text-[var(--accent-contrast)]">Next Page</span>
                 </button>
               ) : (
                 <button

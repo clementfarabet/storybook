@@ -8,6 +8,14 @@ export interface PdfExportOptions {
   includeBackCover?: boolean;
 }
 
+export interface PreparedPdfImage {
+  data: string;
+  format: 'JPEG' | 'PNG';
+  width: number;
+  height: number;
+  aspectRatio: number;
+}
+
 /**
  * Normalizes Unicode characters (curly quotes, em-dashes, non-breaking spaces)
  * and strips non-Latin-1 emojis that cause jsPDF WinAnsi encoding crashes.
@@ -26,33 +34,40 @@ export function sanitizePdfText(str: string | undefined | null): string {
 }
 
 /**
- * Safely extracts or prepares image data for jsPDF.
- * - JPEG and PNG base64 data URLs are used directly (0ms latency, 0 canvas overhead).
- * - SVG data URLs are rasterized to PNG on canvas with a strict 2-second timeout.
- * - Never sets crossOrigin on data: URIs (which causes WebKit/Safari to block loading).
+ * Safely extracts natural image dimensions and prepares image data for jsPDF.
+ * - Extracts naturalWidth and naturalHeight so the image aspect ratio is never distorted.
+ * - Direct base64 JPEG and PNG data URLs are used directly with zero re-compression loss.
+ * - SVGs and canvas fallbacks are rasterized at high print resolution (2048px) with high smoothing.
  */
-async function preparePdfImage(src: string | undefined | null): Promise<{ data: string; format: 'JPEG' | 'PNG' } | null> {
+async function preparePdfImage(src: string | undefined | null): Promise<PreparedPdfImage | null> {
   if (!src || typeof src !== 'string' || !src.trim()) return null;
 
-  // 1. Direct Base64 JPEGs (Default from Gemini)
-  if (src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg')) {
-    return { data: src, format: 'JPEG' };
+  // Node.js or non-browser fallback check
+  if (typeof Image === 'undefined') {
+    const isJpeg = src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg');
+    return {
+      data: src,
+      format: isJpeg ? 'JPEG' : 'PNG',
+      width: 1024,
+      height: 1024,
+      aspectRatio: 1,
+    };
   }
 
-  // 2. Direct Base64 PNGs
-  if (src.startsWith('data:image/png')) {
-    return { data: src, format: 'PNG' };
-  }
-
-  // 3. Fallback/SVG Rasterization with strict timeout & no crossOrigin taint
   return new Promise((resolve) => {
     let finished = false;
     const timeout = setTimeout(() => {
       if (!finished) {
         finished = true;
-        resolve(null);
+        if (src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg')) {
+          resolve({ data: src, format: 'JPEG', width: 1024, height: 1024, aspectRatio: 1 });
+        } else if (src.startsWith('data:image/png')) {
+          resolve({ data: src, format: 'PNG', width: 1024, height: 1024, aspectRatio: 1 });
+        } else {
+          resolve(null);
+        }
       }
-    }, 2000);
+    }, 3000);
 
     try {
       const img = new Image();
@@ -64,20 +79,52 @@ async function preparePdfImage(src: string | undefined | null): Promise<{ data: 
         if (finished) return;
         finished = true;
         clearTimeout(timeout);
+
+        const width = img.naturalWidth || 1024;
+        const height = img.naturalHeight || 1024;
+        const aspectRatio = width / (height || 1);
+
+        // 1. Direct Base64 JPEGs (Full original fidelity from Gemini)
+        if (src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg')) {
+          resolve({ data: src, format: 'JPEG', width, height, aspectRatio });
+          return;
+        }
+
+        // 2. Direct Base64 PNGs (Full original fidelity from Gemini)
+        if (src.startsWith('data:image/png')) {
+          resolve({ data: src, format: 'PNG', width, height, aspectRatio });
+          return;
+        }
+
+        // 3. Fallback / SVG rasterization at high print resolution (up to 2048px)
         try {
+          const maxDim = 2048;
+          let canvasW = width;
+          let canvasH = height;
+          if (canvasW > maxDim || canvasH > maxDim) {
+            if (canvasW > canvasH) {
+              canvasH = Math.round((canvasH * maxDim) / canvasW);
+              canvasW = maxDim;
+            } else {
+              canvasW = Math.round((canvasW * maxDim) / canvasH);
+              canvasH = maxDim;
+            }
+          }
           const canvas = document.createElement('canvas');
-          canvas.width = Math.min(img.naturalWidth || 800, 1024);
-          canvas.height = Math.min(img.naturalHeight || 800, 1024);
+          canvas.width = Math.max(canvasW, 1200);
+          canvas.height = Math.max(canvasH, Math.round(1200 / aspectRatio));
           const ctx = canvas.getContext('2d');
           if (!ctx) {
             resolve(null);
             return;
           }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.fillStyle = '#fbfaf7';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const pngData = canvas.toDataURL('image/png');
-          resolve({ data: pngData, format: 'PNG' });
+          const pngData = canvas.toDataURL('image/png', 0.98);
+          resolve({ data: pngData, format: 'PNG', width, height, aspectRatio });
         } catch (_) {
           resolve(null);
         }
@@ -167,23 +214,31 @@ export async function exportStoryBookToPdf(
     doc.setTextColor(79, 77, 72); // #4f4d48
     doc.text(`Narrated & Created by ${cleanAuthorName}`, pageWidth / 2, authorY, { align: 'center' });
 
-    // Cover Illustration (Use Page 1's illustration if available, or placeholder)
+    // Cover Illustration (Preserves natural aspect ratio without square distortion)
     const coverImageSrc = book.pages[0]?.imageData;
-    const availableHeight = pageHeight - margin - 16 - (authorY + 8);
-    const maxImgSize = isSquare ? 95 : 110;
-    const imgSize = Math.max(50, Math.min(maxImgSize, availableHeight));
-    const imgX = (pageWidth - imgSize) / 2;
-    const imgY = authorY + 6;
+    const availableHeight = pageHeight - margin - 16 - (authorY + 6);
+    const maxBoxW = Math.min(160, contentWidth - 8);
+    const maxBoxH = Math.max(50, Math.min(isSquare ? 105 : 130, availableHeight));
 
     let coverDrawn = false;
     if (coverImageSrc) {
       try {
         const coverImg = await preparePdfImage(coverImageSrc);
         if (coverImg) {
-          doc.addImage(coverImg.data, coverImg.format, imgX, imgY, imgSize, imgSize, undefined, 'FAST');
+          const ar = coverImg.aspectRatio || 1;
+          let imgW = maxBoxW;
+          let imgH = imgW / ar;
+          if (imgH > maxBoxH) {
+            imgH = maxBoxH;
+            imgW = imgH * ar;
+          }
+          const imgX = (pageWidth - imgW) / 2;
+          const imgY = authorY + 6 + (maxBoxH - imgH) / 2;
+
+          doc.addImage(coverImg.data, coverImg.format, imgX, imgY, imgW, imgH, undefined, 'NONE');
           doc.setDrawColor(227, 224, 217);
           doc.setLineWidth(0.6);
-          doc.rect(imgX, imgY, imgSize, imgSize);
+          doc.rect(imgX, imgY, imgW, imgH);
           coverDrawn = true;
         }
       } catch (err) {
@@ -192,21 +247,25 @@ export async function exportStoryBookToPdf(
     }
 
     if (!coverDrawn) {
-      // Graceful draft placeholder
+      // Graceful draft placeholder (preserves standard 4:3 picture ratio instead of harsh square)
+      const placeholderW = 120;
+      const placeholderH = 90;
+      const placeholderX = (pageWidth - placeholderW) / 2;
+      const placeholderY = authorY + 6 + (maxBoxH - placeholderH) / 2;
       doc.setDrawColor(227, 224, 217);
       doc.setLineWidth(0.6);
-      doc.rect(imgX, imgY, imgSize, imgSize);
+      doc.rect(placeholderX, placeholderY, placeholderW, placeholderH);
       doc.setFont('times', 'italic');
       doc.setFontSize(11);
       doc.setTextColor(140, 137, 129);
-      doc.text('A Waiting Adventure', pageWidth / 2, imgY + imgSize / 2, { align: 'center' });
+      doc.text('A Waiting Adventure', pageWidth / 2, placeholderY + placeholderH / 2, { align: 'center' });
     }
 
     // Cover Footer
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(140, 137, 129);
-    doc.text('learnandplay.ai · Storybook', pageWidth / 2, pageHeight - margin + 2, {
+    doc.text('learnandplay.ai · Storybook', pageWidth / 2, pageHeight - margin - 2, {
       align: 'center',
     });
   }
@@ -237,32 +296,58 @@ export async function exportStoryBookToPdf(
     doc.text(cleanHeader.toUpperCase(), margin, currentY);
     currentY += 6;
 
-    // Page Illustration (Top half)
-    const imgHeight = isSquare ? 90 : 110;
-    const imgWidth = contentWidth;
+    // Page Illustration (Top half - preserving true aspect ratio with zero distortion)
+    const maxW = contentWidth;
+    const maxH = isSquare ? 98 : 120;
 
     if (page.imageData) {
       try {
         const pageImg = await preparePdfImage(page.imageData);
         if (pageImg) {
-          doc.addImage(pageImg.data, pageImg.format, margin, currentY, imgWidth, imgHeight, undefined, 'FAST');
+          const ar = pageImg.aspectRatio || 1;
+          let renderW = maxW;
+          let renderH = renderW / ar;
+          if (renderH > maxH) {
+            renderH = maxH;
+            renderW = renderH * ar;
+          }
+          const renderX = margin + (contentWidth - renderW) / 2;
+          const renderY = currentY;
+
+          doc.addImage(pageImg.data, pageImg.format, renderX, renderY, renderW, renderH, undefined, 'NONE');
           doc.setDrawColor(227, 224, 217);
           doc.setLineWidth(0.5);
-          doc.rect(margin, currentY, imgWidth, imgHeight);
+          doc.rect(renderX, renderY, renderW, renderH);
+
+          currentY += renderH + 8;
+        } else {
+          currentY += 8;
         }
       } catch (e) {
         console.warn('Page image draw error:', e);
+        currentY += 8;
       }
+    } else {
+      currentY += 8;
     }
-    currentY += imgHeight + 8;
 
     // Page Story Prose (Bottom half)
+    let fontSize = isSquare ? 13 : 14;
     doc.setFont('times', 'normal');
-    doc.setFontSize(isSquare ? 13 : 14);
+    doc.setFontSize(fontSize);
     doc.setTextColor(27, 26, 24);
 
     const safeStoryText = sanitizePdfText(page.storyText || '');
-    const textLines = doc.splitTextToSize(safeStoryText, contentWidth - 4);
+    let textLines = doc.splitTextToSize(safeStoryText, contentWidth - 4);
+
+    // Auto-fit font size if prose would overflow towards footer
+    const maxTextHeight = pageHeight - margin - 8 - currentY;
+    while (fontSize > 9 && textLines.length * (fontSize * 0.45 * 1.5) > maxTextHeight) {
+      fontSize -= 0.5;
+      doc.setFontSize(fontSize);
+      textLines = doc.splitTextToSize(safeStoryText, contentWidth - 4);
+    }
+
     doc.text(textLines, margin + 2, currentY, {
       lineHeightFactor: 1.5,
     });
@@ -271,7 +356,7 @@ export async function exportStoryBookToPdf(
     doc.setFont('times', 'italic');
     doc.setFontSize(10);
     doc.setTextColor(140, 137, 129);
-    doc.text(`— ${page.pageNumber} —`, pageWidth / 2, pageHeight - margin + 2, {
+    doc.text(`— ${page.pageNumber} —`, pageWidth / 2, pageHeight - margin - 2, {
       align: 'center',
     });
   }
@@ -339,7 +424,7 @@ export async function exportStoryBookToPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(140, 137, 129);
-    doc.text('Created with Storybook AI on learnandplay.ai', pageWidth / 2, pageHeight - margin + 2, {
+    doc.text('Created with Storybook AI on learnandplay.ai', pageWidth / 2, pageHeight - margin - 2, {
       align: 'center',
     });
   }

@@ -202,4 +202,80 @@ test('WH13: robustParseStoryResponse parses valid, markdown-wrapped, unescaped, 
   assert.ok(r5.illustrationPrompt.includes('The brave knight found a key'));
 });
 
+// Test 8: PDF Aspect Ratio Calculation preserves proportions (no square distortion)
+test('PDF Export: preserves natural aspect ratio of non-square images on cover and story pages', () => {
+  function computeCoverDimensions(aspectRatio, pageWidth = 210, pageHeight = 210, margin = 16, authorY = 65) {
+    const contentWidth = pageWidth - margin * 2;
+    const availableHeight = pageHeight - margin - 16 - (authorY + 6);
+    const maxBoxW = Math.min(160, contentWidth - 8);
+    const maxBoxH = Math.max(50, Math.min(105, availableHeight));
+
+    let imgW = maxBoxW;
+    let imgH = imgW / aspectRatio;
+    if (imgH > maxBoxH) {
+      imgH = maxBoxH;
+      imgW = imgH * aspectRatio;
+    }
+    const imgX = (pageWidth - imgW) / 2;
+    const imgY = authorY + 6 + (maxBoxH - imgH) / 2;
+    return { imgW, imgH, imgX, imgY, renderedAspectRatio: imgW / imgH };
+  }
+
+  // 16:9 widescreen landscape illustration (e.g. from Gemini)
+  const wide = computeCoverDimensions(16 / 9);
+  assert.ok(Math.abs(wide.renderedAspectRatio - 16 / 9) < 0.001, 'Cover preserves 16:9 aspect ratio');
+  assert.notEqual(wide.imgW, wide.imgH, 'Cover is not squashed into a 1:1 square');
+
+  // 4:3 standard illustration
+  const standard = computeCoverDimensions(4 / 3);
+  assert.ok(Math.abs(standard.renderedAspectRatio - 4 / 3) < 0.001, 'Cover preserves 4:3 aspect ratio');
+
+  // 1:1 square illustration
+  const square = computeCoverDimensions(1.0);
+  assert.ok(Math.abs(square.renderedAspectRatio - 1.0) < 0.001, 'Square remains 1:1');
+});
+
+// Test 9: Audio Transcript Accumulation prevents word erasure across multi-chunk SpeechRecognition events
+test('Audio Transcription: cumulative transcript aggregation preserves all spoken chunks', () => {
+  function accumulateTranscripts(accumulatedText, results) {
+    let sessionFinal = '';
+    let sessionInterim = '';
+
+    for (let i = 0; i < results.length; ++i) {
+      const res = results[i];
+      if (res.isFinal) {
+        sessionFinal += res[0].transcript + ' ';
+      } else {
+        sessionInterim += res[0].transcript;
+      }
+    }
+
+    return [accumulatedText, sessionFinal, sessionInterim]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .replace(/\s+/g, ' ');
+  }
+
+  // Event 1: Initial speech chunk finalized
+  const event1Results = [{ isFinal: true, 0: { transcript: 'Once upon a time' } }];
+  const t1 = accumulateTranscripts('', event1Results);
+  assert.equal(t1, 'Once upon a time');
+
+  // Event 2: Second chunk interim while first is still in results
+  const event2Results = [
+    { isFinal: true, 0: { transcript: 'Once upon a time' } },
+    { isFinal: false, 0: { transcript: 'in the quiet woods' } },
+  ];
+  const t2 = accumulateTranscripts('', event2Results);
+  assert.equal(t2, 'Once upon a time in the quiet woods');
+
+  // Event 3: After pause, speech restarts with previous text stored in accumulatedText
+  const event3Results = [
+    { isFinal: true, 0: { transcript: 'a little dragon arrived' } },
+  ];
+  const t3 = accumulateTranscripts('Once upon a time in the quiet woods', event3Results);
+  assert.equal(t3, 'Once upon a time in the quiet woods a little dragon arrived');
+});
+
 

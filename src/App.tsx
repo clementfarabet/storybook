@@ -80,7 +80,9 @@ export const App: React.FC = () => {
           setViewMode('narrate');
         } else {
           setBook(stored);
-          if (stored.pages.length === 0) {
+          if (stored.pages.length > 0) {
+            setViewMode('read');
+          } else {
             setViewMode('narrate');
           }
         }
@@ -398,7 +400,7 @@ export const App: React.FC = () => {
 
       {/* Hero Title & Status Banner */}
       <section className="border-b" style={{ borderColor: 'var(--rule)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+        <div className={`w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-3 transition-[max-width] duration-300 ${viewMode === 'read' ? 'max-w-[1480px]' : 'max-w-6xl'}`}>
           <div className="space-y-1">
             <span
               className="text-xs font-mono uppercase tracking-wider block"
@@ -467,7 +469,7 @@ export const App: React.FC = () => {
       </section>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-between">
+      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col justify-between transition-[max-width] duration-300 ${viewMode === 'read' ? 'max-w-[1480px]' : 'max-w-6xl'}`}>
         {viewMode === 'narrate' ? (
           <div className="max-w-xl mx-auto w-full my-auto">
             <NarrationStudio
@@ -481,7 +483,7 @@ export const App: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="space-y-6 flex-1 flex flex-col justify-center">
+          <div className="space-y-6 flex-1 flex flex-col justify-center w-full">
             <BookSpread
               book={book}
               currentPageIndex={book.currentPageIndex}

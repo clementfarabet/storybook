@@ -2,6 +2,10 @@
 State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ and pushed to GitHub at https://github.com/clementfarabet/storybook. Backend microservice running on clmt.ai.
 
 ## Latest
+- Immersive Full-Width Book Spread: expanded container to max-w-[1420px], enlarged illustration frame to 560px–620px with deep gutter shadows and responsive scaling across mobile and desktop.
+- High-Quality & Proportional PDF Export: dynamic proportional bounds preserve natural 16:9 / 4:3 aspect ratios without square distortion, uncompressed image delivery, auto-fitted font sizing to prevent footer overlap, and balanced margins.
+- Dual-Engine Live Audio & Gemini AI Transcription: fixed Web Speech API cumulative result indexing and debounced lifecycle restarts; added server-side `/storybook/api/transcribe` endpoint via Gemini 3.8 Flash (`ai.interactions.create`) with automatic fallback when speech recognition is absent or fails.
+- Automated tests: `npm test` (9/9 tests passing).
 - Fixed PDF Export: direct-passed native JPEG/PNG base64 data to `jsPDF.addImage` (eliminating hung canvas re-rasterization), auto-detected image format types, added 2s timeout guard on SVG rasterization, and added direct manual download link in `PdfExportModal`. Verified live with real 1.4MB Gemini illustrations in Google Chrome.
 - Fixed 413 Payload Too Large error by stripping heavy base64 `imageData` from client-to-server context requests (`previousPages` and `retheme-book`) and configuring nginx `client_max_body_size 50M` with `proxy_read_timeout 300s`.
 - Redesigned Theme & Age Group settings into a unified selector with staged selections, a sticky preview bar, and an explicit "Apply" button with smart retheme prompting for existing pages.

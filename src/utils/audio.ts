@@ -28,15 +28,19 @@ export class LiveAudioRecorder {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private animFrameId: number | null = null;
+  private accumulatedText = '';
+  private restartTimeout: ReturnType<typeof setTimeout> | null = null;
 
   public isRecording = false;
 
   async start({
+    initialText = '',
     onTranscript,
     onAudioLevel,
     onError,
     onEnd,
   }: {
+    initialText?: string;
     onTranscript: (text: string, isFinal: boolean) => void;
     onAudioLevel?: (level: number) => void;
     onError?: (err: Error) => void;
@@ -45,6 +49,7 @@ export class LiveAudioRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.audioChunks = [];
+      this.accumulatedText = (initialText || '').trim();
 
       // 1. Audio Level Visualizer
       if (onAudioLevel) {
@@ -52,6 +57,9 @@ export class LiveAudioRecorder {
           const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
           if (AudioContextClass) {
             this.audioContext = new AudioContextClass();
+            if (this.audioContext.state === 'suspended') {
+              await this.audioContext.resume();
+            }
             const source = this.audioContext.createMediaStreamSource(this.stream);
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 64;
@@ -80,10 +88,20 @@ export class LiveAudioRecorder {
       }
 
       // 2. MediaRecorder for high quality audio payload
-      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', ''];
-      const supportedMime = mimeTypes.find(m => !m || MediaRecorder.isTypeSupported(m)) || '';
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus',
+        '',
+      ];
+      const supportedMime = mimeTypes.find((m) => !m || MediaRecorder.isTypeSupported(m)) || '';
 
-      this.mediaRecorder = new MediaRecorder(this.stream, supportedMime ? { mimeType: supportedMime } : undefined);
+      this.mediaRecorder = new MediaRecorder(
+        this.stream,
+        supportedMime ? { mimeType: supportedMime } : undefined
+      );
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           this.audioChunks.push(event.data);
@@ -92,50 +110,72 @@ export class LiveAudioRecorder {
 
       this.mediaRecorder.start(250); // Slice chunks every 250ms
 
-      // 3. Web Speech Recognition for instant feedback
+      // 3. Web Speech Recognition for instant live streaming feedback
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         try {
-          this.recognition = new SpeechRecognition();
-          this.recognition.continuous = true;
-          this.recognition.interimResults = true;
-          this.recognition.lang = 'en-US';
+          const recognition = new SpeechRecognition();
+          this.recognition = recognition;
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
 
-          this.recognition.onresult = (event: any) => {
-            let interimTranscript = '';
-            let finalTranscript = '';
+          recognition.onresult = (event: any) => {
+            let sessionFinal = '';
+            let sessionInterim = '';
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // Accumulate across all results in this session (not just resultIndex)
+            for (let i = 0; i < event.results.length; ++i) {
               const res = event.results[i];
               if (res.isFinal) {
-                finalTranscript += res[0].transcript + ' ';
+                sessionFinal += res[0].transcript + ' ';
               } else {
-                interimTranscript += res[0].transcript;
+                sessionInterim += res[0].transcript;
               }
             }
 
-            const current = (finalTranscript + interimTranscript).trim();
-            if (current) {
-              onTranscript(current, false);
+            const combined = [this.accumulatedText, sessionFinal, sessionInterim]
+              .filter(Boolean)
+              .join(' ')
+              .trim()
+              .replace(/\s+/g, ' ');
+
+            if (combined) {
+              onTranscript(combined, false);
             }
           };
 
-          this.recognition.onerror = (event: any) => {
+          recognition.onerror = (event: any) => {
             console.warn('Speech recognition notice:', event.error);
-          };
-
-          this.recognition.onend = () => {
-            // Auto restart if still actively recording
-            if (this.isRecording && this.recognition) {
+            if (event.error === 'no-speech') return; // Silence is normal
+            if (['audio-capture', 'not-allowed', 'service-not-allowed', 'network'].includes(event.error)) {
+              // Gracefully stop recognition so MediaRecorder + server transcription takes over
               try {
-                this.recognition.start();
+                this.recognition?.stop();
               } catch (_) {}
+              this.recognition = null;
             }
           };
 
-          this.recognition.start();
+          recognition.onend = () => {
+            // Commit any recognized text before restarting
+            if (this.isRecording && this.recognition) {
+              if (this.restartTimeout) clearTimeout(this.restartTimeout);
+              this.restartTimeout = setTimeout(() => {
+                if (this.isRecording && this.recognition) {
+                  try {
+                    this.recognition.start();
+                  } catch (_) {}
+                }
+              }, 150);
+            } else if (onEnd) {
+              onEnd();
+            }
+          };
+
+          recognition.start();
         } catch (recErr) {
-          console.warn('SpeechRecognition failed to start:', recErr);
+          console.warn('SpeechRecognition failed to start (will rely on server transcription):', recErr);
         }
       }
 
@@ -150,6 +190,11 @@ export class LiveAudioRecorder {
 
   async stop(): Promise<{ audioBlob: Blob | null; base64Audio: string | null; mimeType: string }> {
     this.isRecording = false;
+
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
 
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
@@ -196,6 +241,12 @@ export class LiveAudioRecorder {
         }
       };
 
+      try {
+        if (typeof this.mediaRecorder.requestData === 'function' && this.mediaRecorder.state === 'recording') {
+          this.mediaRecorder.requestData();
+        }
+      } catch (_) {}
+
       this.mediaRecorder.stop();
     });
   }
@@ -206,6 +257,32 @@ export class LiveAudioRecorder {
       this.stream = null;
     }
   }
+}
+
+// Server-side audio transcription helper via Gemini 3.8 Flash
+export async function transcribeAudioWithServer(
+  audioBase64: string,
+  mimeType: string = 'audio/webm'
+): Promise<string> {
+  if (!audioBase64) return '';
+  try {
+    const res = await fetch('/storybook/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioBase64,
+        audioMimeType: mimeType,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return (data.text || '').trim();
+    }
+  } catch (err) {
+    console.warn('[Audio] Server audio transcription failed:', err);
+  }
+  return '';
 }
 
 // Text-to-Speech playback helper (Gemini TTS with Web Speech fallback)

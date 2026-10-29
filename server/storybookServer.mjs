@@ -512,6 +512,27 @@ Return ONLY the updated illustration prompt as plain text. No quotes, no markdow
     return;
   }
 
+  // 4. Transcribe Spoken Narration (Speech-to-Text via Gemini 3.8 Flash)
+  if ((pathname === '/storybook/api/transcribe' || pathname === '/api/transcribe') && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const audioBase64 = body.audioBase64 || '';
+      const audioMimeType = body.audioMimeType || 'audio/webm';
+
+      if (!audioBase64) {
+        sendJson(res, 400, { error: 'No audio data provided' });
+        return;
+      }
+
+      const text = await transcribeAudio(audioBase64, audioMimeType);
+      sendJson(res, 200, { success: true, text });
+    } catch (err) {
+      console.error('[Storybook Server] transcribe error:', err);
+      sendJson(res, 500, { error: err.message || 'Audio transcription failed' });
+    }
+    return;
+  }
+
   // 404
   sendJson(res, 404, { error: 'Not found' });
 });
