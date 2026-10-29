@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 @layer base {
+  html, body {
+    background-color: var(--paper);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -8,6 +14,19 @@
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--paper);
     color: var(--ink);
+  }
+
+  /* Prevent iOS Safari automatic zoom on focus on mobile */
+  @media (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  button, [role="button"], a, input, select, textarea {
+    touch-action: manipulation;
   }
 
   h1, h2, h3, .font-serif {

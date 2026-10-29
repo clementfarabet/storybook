@@ -265,7 +265,7 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
                 value={transcript}
                 onChange={(e) => setTranscript(e.target.value)}
                 rows={3}
-                className="w-full p-3 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-hidden resize-none font-serif leading-relaxed"
+                className="w-full p-3 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-base sm:text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-hidden resize-none font-serif leading-relaxed"
                 placeholder="Edit your story narration here..."
                 aria-label="Story narration text"
               />

@@ -10,17 +10,92 @@ export interface PdfExportOptions {
 
 /**
  * Normalizes Unicode characters (curly quotes, em-dashes, non-breaking spaces)
- * into standard PDF-safe equivalents to prevent jsPDF font encoding crashes.
+ * and strips non-Latin-1 emojis that cause jsPDF WinAnsi encoding crashes.
  */
-function sanitizePdfText(str: string | undefined | null): string {
+export function sanitizePdfText(str: string | undefined | null): string {
   if (!str) return '';
   return String(str)
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
     .replace(/[\u2013\u2014]/g, '-')
     .replace(/\u2026/g, '...')
-    .replace(/[\u00A0]/g, ' ')
+    .replace(/[\u00A0\u200B\uFEFF]/g, ' ')
+    // Remove emojis and surrogate pairs outside Latin-1
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
     .trim();
+}
+
+/**
+ * Safely extracts or prepares image data for jsPDF.
+ * - JPEG and PNG base64 data URLs are used directly (0ms latency, 0 canvas overhead).
+ * - SVG data URLs are rasterized to PNG on canvas with a strict 2-second timeout.
+ * - Never sets crossOrigin on data: URIs (which causes WebKit/Safari to block loading).
+ */
+async function preparePdfImage(src: string | undefined | null): Promise<{ data: string; format: 'JPEG' | 'PNG' } | null> {
+  if (!src || typeof src !== 'string' || !src.trim()) return null;
+
+  // 1. Direct Base64 JPEGs (Default from Gemini)
+  if (src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg')) {
+    return { data: src, format: 'JPEG' };
+  }
+
+  // 2. Direct Base64 PNGs
+  if (src.startsWith('data:image/png')) {
+    return { data: src, format: 'PNG' };
+  }
+
+  // 3. Fallback/SVG Rasterization with strict timeout & no crossOrigin taint
+  return new Promise((resolve) => {
+    let finished = false;
+    const timeout = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        resolve(null);
+      }
+    }, 2000);
+
+    try {
+      const img = new Image();
+      if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+        img.crossOrigin = 'anonymous';
+      }
+
+      img.onload = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.min(img.naturalWidth || 800, 1024);
+          canvas.height = Math.min(img.naturalHeight || 800, 1024);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(null);
+            return;
+          }
+          ctx.fillStyle = '#fbfaf7';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const pngData = canvas.toDataURL('image/png');
+          resolve({ data: pngData, format: 'PNG' });
+        } catch (_) {
+          resolve(null);
+        }
+      };
+
+      img.onerror = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+        resolve(null);
+      };
+
+      img.src = src;
+    } catch (_) {
+      clearTimeout(timeout);
+      resolve(null);
+    }
+  });
 }
 
 export async function exportStoryBookToPdf(
@@ -34,7 +109,7 @@ export async function exportStoryBookToPdf(
     includeBackCover = true,
   } = options;
 
-  // Square format: 210mm x 210mm (approx 8.27" x 8.27") or Letter portrait: 215.9mm x 279.4mm
+  // Square format: 210mm x 210mm (classic picture book) or Letter portrait: 215.9mm x 279.4mm
   const isSquare = format === 'square';
   const pageWidth = isSquare ? 210 : 215.9;
   const pageHeight = isSquare ? 210 : 279.4;
@@ -47,63 +122,6 @@ export async function exportStoryBookToPdf(
 
   const margin = 16;
   const contentWidth = pageWidth - margin * 2;
-
-  // Helper to load and rasterize any image (including SVGs and base64 PNGs) safely to PNG
-  const rasterizeImage = (src: string): Promise<string> => {
-    return new Promise((resolve) => {
-      if (!src || typeof src !== 'string') {
-        resolve(createFallbackDataUrl());
-        return;
-      }
-      if (src.startsWith('data:image/png;base64,')) {
-        resolve(src);
-        return;
-      }
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || 800;
-          canvas.height = img.naturalHeight || 800;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve(createFallbackDataUrl());
-            return;
-          }
-          ctx.fillStyle = '#fbfaf7';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/png'));
-        } catch (_) {
-          resolve(createFallbackDataUrl());
-        }
-      };
-      img.onerror = () => {
-        resolve(createFallbackDataUrl());
-      };
-      img.src = src;
-    });
-  };
-
-  const createFallbackDataUrl = (): string => {
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#f5f3ef';
-        ctx.fillRect(0, 0, 400, 400);
-        ctx.strokeStyle = '#e3e0d9';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(8, 8, 384, 384);
-      }
-      return canvas.toDataURL('image/png');
-    } catch (_) {
-      return '';
-    }
-  };
 
   const cleanBookTitle = sanitizePdfText(book.title || 'My Magical Story');
   const cleanAuthorName = sanitizePdfText(authorName);
@@ -154,28 +172,27 @@ export async function exportStoryBookToPdf(
     const availableHeight = pageHeight - margin - 16 - (authorY + 8);
     const maxImgSize = isSquare ? 95 : 110;
     const imgSize = Math.max(50, Math.min(maxImgSize, availableHeight));
+    const imgX = (pageWidth - imgSize) / 2;
+    const imgY = authorY + 6;
 
+    let coverDrawn = false;
     if (coverImageSrc) {
       try {
-        const coverImgData = await rasterizeImage(coverImageSrc);
-        if (coverImgData) {
-          const imgX = (pageWidth - imgSize) / 2;
-          const imgY = authorY + 6;
-
-          doc.addImage(coverImgData, 'PNG', imgX, imgY, imgSize, imgSize);
-
-          // Frame around image
+        const coverImg = await preparePdfImage(coverImageSrc);
+        if (coverImg) {
+          doc.addImage(coverImg.data, coverImg.format, imgX, imgY, imgSize, imgSize, undefined, 'FAST');
           doc.setDrawColor(227, 224, 217);
           doc.setLineWidth(0.6);
           doc.rect(imgX, imgY, imgSize, imgSize);
+          coverDrawn = true;
         }
       } catch (err) {
         console.warn('Could not draw cover image on PDF:', err);
       }
-    } else {
-      // Graceful draft placeholder when 0 pages exist
-      const imgX = (pageWidth - imgSize) / 2;
-      const imgY = authorY + 6;
+    }
+
+    if (!coverDrawn) {
+      // Graceful draft placeholder
       doc.setDrawColor(227, 224, 217);
       doc.setLineWidth(0.6);
       doc.rect(imgX, imgY, imgSize, imgSize);
@@ -226,9 +243,9 @@ export async function exportStoryBookToPdf(
 
     if (page.imageData) {
       try {
-        const pageImgData = await rasterizeImage(page.imageData);
-        if (pageImgData) {
-          doc.addImage(pageImgData, 'PNG', margin, currentY, imgWidth, imgHeight, undefined, 'FAST');
+        const pageImg = await preparePdfImage(page.imageData);
+        if (pageImg) {
+          doc.addImage(pageImg.data, pageImg.format, margin, currentY, imgWidth, imgHeight, undefined, 'FAST');
           doc.setDrawColor(227, 224, 217);
           doc.setLineWidth(0.5);
           doc.rect(margin, currentY, imgWidth, imgHeight);

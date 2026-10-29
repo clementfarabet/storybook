@@ -61,6 +61,11 @@ export const App: React.FC = () => {
     try {
       localStorage.setItem('lp_theme', themeMode);
       localStorage.setItem('storybook_theme', themeMode);
+      const bg = themeMode === 'light' ? '#fbfaf7' : '#121211';
+      const meta = document.getElementById('theme-color-meta');
+      if (meta) {
+        meta.setAttribute('content', bg);
+      }
     } catch (_) {}
   }, [themeMode]);
 
@@ -422,7 +427,7 @@ export const App: React.FC = () => {
                 onChange={(e) => handleUpdateAuthor(e.target.value)}
                 placeholder="Child's Name"
                 aria-label="Story narrator or author name"
-                className="font-medium text-[var(--ink)] bg-transparent border-b border-transparent hover:border-[var(--rule)] focus:border-[var(--accent)] focus:outline-hidden py-1 px-1.5 min-h-[44px] min-w-[120px] max-w-[200px] cursor-pointer"
+                className="font-medium text-[var(--ink)] bg-transparent border-b border-transparent hover:border-[var(--rule)] focus:border-[var(--accent)] focus:outline-hidden py-1 px-1.5 min-h-[44px] min-w-[120px] max-w-[200px] cursor-pointer text-base sm:text-sm"
                 title="Click to edit narrator name"
               />
               <span>· Calibrated for {currentAgeConfig.label} ({currentAgeConfig.ageRange})</span>

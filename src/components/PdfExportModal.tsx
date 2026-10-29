@@ -112,7 +112,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               placeholder="Child's Name (e.g. Leo & Mom)"
-              className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+              className="w-full text-base sm:text-sm px-3.5 py-2.5 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
             />
           </div>
 
@@ -191,9 +191,19 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
           </button>
 
           {downloadUrl && (
-            <p className="text-center text-xs text-[var(--accent)] font-medium">
-              ✓ PDF generated and downloaded!
-            </p>
+            <div className="space-y-2 pt-1 text-center">
+              <a
+                href={downloadUrl}
+                download={`${(book.title || 'storybook').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-storybook.pdf`}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Click here if download didn't start automatically</span>
+              </a>
+              <p className="text-xs text-[var(--ink-2)]">
+                ✓ Ready! Check your downloads folder or tap above to save.
+              </p>
+            </div>
           )}
         </div>
       </div>

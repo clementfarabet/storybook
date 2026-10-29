@@ -102,14 +102,14 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
             value={customName}
             onChange={(e) => setCustomName(e.target.value)}
             placeholder="Theme Name (e.g. Neon Cyberpunk Kittens)"
-            className="w-full text-xs px-3 py-2 rounded-lg bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] placeholder-[var(--ink-3)] focus:border-[var(--accent)] focus:outline-none"
+            className="w-full text-base sm:text-xs px-3 py-2 rounded-lg bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] placeholder-[var(--ink-3)] focus:border-[var(--accent)] focus:outline-none"
           />
           <textarea
             value={customStyle}
             onChange={(e) => setCustomStyle(e.target.value)}
             rows={2}
             placeholder="Describe the art style (e.g., Chalk drawing on dark pavement, neon glows, cute cartoon characters, friendly atmosphere...)"
-            className="w-full text-xs px-3 py-2 rounded-lg bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] placeholder-[var(--ink-3)] focus:border-[var(--accent)] focus:outline-none resize-none"
+            className="w-full text-base sm:text-xs px-3 py-2 rounded-lg bg-[var(--paper-2)] border border-[var(--rule)] text-[var(--ink)] placeholder-[var(--ink-3)] focus:border-[var(--accent)] focus:outline-none resize-none"
           />
           <button
             type="submit"

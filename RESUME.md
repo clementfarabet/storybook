@@ -2,6 +2,7 @@
 State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ and pushed to GitHub at https://github.com/clementfarabet/storybook. Backend microservice running on clmt.ai.
 
 ## Latest
+- Fixed PDF Export: direct-passed native JPEG/PNG base64 data to `jsPDF.addImage` (eliminating hung canvas re-rasterization), auto-detected image format types, added 2s timeout guard on SVG rasterization, and added direct manual download link in `PdfExportModal`. Verified live with real 1.4MB Gemini illustrations in Google Chrome.
 - Fixed 413 Payload Too Large error by stripping heavy base64 `imageData` from client-to-server context requests (`previousPages` and `retheme-book`) and configuring nginx `client_max_body_size 50M` with `proxy_read_timeout 300s`.
 - Redesigned Theme & Age Group settings into a unified selector with staged selections, a sticky preview bar, and an explicit "Apply" button with smart retheme prompting for existing pages.
 - Verified end-to-end audit creating 3 consecutive pages and retheming all 3 pages live on production.
