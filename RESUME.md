@@ -1,15 +1,17 @@
 # Storybook · learnandplay.ai
-State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ with backend microservice running on clmt.ai.
+State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ and pushed to GitHub at https://github.com/clementfarabet/storybook. Backend microservice running on clmt.ai.
 
 ## Latest
 - App starts from a clean, blank book (`pages: []`), opening immediately into the Creative Studio.
 - Added page deletion with gentle confirmation modal, automatic renumbering, and fallback to Studio.
 - Made typed text a first-class creation mode alongside voice narration with live sync and idea starters.
+- Replaced footer AI mentions with standard LearnX disclaimer: *"Disclaimer: These projects are built for fun — take all AI-generated results and syntheses with a grain of salt."*
 - Calibrated 4 age brackets (Toddler, Early Reader, Middle Grade, YA & Adult) adapting vocabulary and cadence.
 - Implemented visual theme selector & freeform creator with full book retheming (capped at 10 pages).
 - IndexedDB client storage engine (`storybook_db`) handles multi-megabyte illustrations without quota errors.
 
 ## Run, test, ship
+- GitHub Repository: https://github.com/clementfarabet/storybook
 - Dev frontend: `npm run dev` (Vite on http://localhost:5175/)
 - Backend server: `npm run server` (Node on http://127.0.0.1:8794/)
 - Typecheck: `npx tsc --noEmit` (0 errors)
