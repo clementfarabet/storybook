@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 
 dns.setDefaultResultOrder('ipv4first');
 
-const PORT = Number(process.env.PORT || 8794);
+const PORT = Number(process.env.STORYBOOK_PORT || (process.env.PORT && process.env.PORT !== '8791' ? process.env.PORT : 8794));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
