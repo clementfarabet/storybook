@@ -144,7 +144,12 @@ export const App: React.FC = () => {
           theme: book.theme,
           pageNumber: nextPageNumber,
           storyTitle: book.title,
-          previousPages: book.pages.slice(-3),
+          previousPages: book.pages.slice(-3).map((p) => ({
+            pageNumber: p.pageNumber,
+            pageTitle: p.pageTitle,
+            storyText: p.storyText,
+            illustrationPrompt: p.illustrationPrompt,
+          })),
           characterBible: book.characterBible,
         }),
       });
@@ -194,7 +199,14 @@ export const App: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pages: book.pages,
+          pages: book.pages.map((p) => ({
+            pageNumber: p.pageNumber,
+            pageTitle: p.pageTitle,
+            storyText: p.storyText,
+            illustrationPrompt: p.illustrationPrompt,
+            originalNarration: p.originalNarration,
+            characterBible: p.characterBible,
+          })),
           newTheme,
           ageGroup: book.ageGroup,
         }),
@@ -248,7 +260,12 @@ export const App: React.FC = () => {
           theme: book.theme,
           pageNumber: targetPage.pageNumber,
           storyTitle: book.title,
-          previousPages: book.pages.slice(0, pageIndex),
+          previousPages: book.pages.slice(0, pageIndex).map((p) => ({
+            pageNumber: p.pageNumber,
+            pageTitle: p.pageTitle,
+            storyText: p.storyText,
+            illustrationPrompt: p.illustrationPrompt,
+          })),
           characterBible: book.characterBible,
         }),
       });
