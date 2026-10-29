@@ -2,6 +2,9 @@
 State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ and pushed to GitHub at https://github.com/clementfarabet/storybook. Backend microservice running on clmt.ai.
 
 ## Latest
+- Real-time Gemini Live API Streaming Transcription: replaced Web Speech API with real-time streaming speech-to-text powered by `gemini-3.5-transcribe-live` over WebSockets with 16kHz PCM downsampling and interim hypothesis rendering.
+- Instant Page Generation on Button Hit: hitting the recording button immediately stops the stream, finalizes speech-to-text, and triggers storybook page generation in one seamless action without redundant clicks.
+- Secure Server Ephemeral Auth Tokens: added `/storybook/api/live-token` endpoint utilizing `ai.authTokens.create` constrained to `gemini-3.5-transcribe-live` with 30-minute validity and 5-minute session initialization window.
 - Immersive Full-Width Book Spread: expanded container to max-w-[1420px], enlarged illustration frame to 560px–620px with deep gutter shadows and responsive scaling across mobile and desktop.
 - High-Quality & Proportional PDF Export: dynamic proportional bounds preserve natural 16:9 / 4:3 aspect ratios without square distortion, uncompressed image delivery, auto-fitted font sizing to prevent footer overlap, and balanced margins.
 - Dual-Engine Live Audio & Gemini AI Transcription: fixed Web Speech API cumulative result indexing and debounced lifecycle restarts; added server-side `/storybook/api/transcribe` endpoint via Gemini 3.8 Flash (`ai.interactions.create`) with automatic fallback when speech recognition is absent or fails.
