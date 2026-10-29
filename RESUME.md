@@ -15,7 +15,8 @@ State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/
 - Dev frontend: `npm run dev` (Vite on http://localhost:5175/)
 - Backend server: `npm run server` (Node on http://127.0.0.1:8794/)
 - Typecheck: `npx tsc --noEmit` (0 errors)
-- Automated tests: `npm test` (6/6 tests passing)
+- Fixed story generation parse error by explicitly configuring `thinking_level: 'low'`, `response_format: { type: 'text', mime_type: 'application/json' }`, increasing token ceiling to 4096, and adding multi-stage resilient JSON parsing fallbacks.
+- Automated tests: `npm test` (7/7 tests passing)
 - Production build: `npm run build` (dist/ bundled in ~1.0s)
 - Production deploy: `npm run deploy` (syncs to clmt.ai:/var/www/learnandplay/storybook)
 - Live URL: https://learnandplay.ai/storybook/
