@@ -100,44 +100,14 @@ export const STORAGE_KEY = 'storybook_active_book_v1';
 export const LIBRARY_STORAGE_KEY = 'storybook_saved_library_v1';
 
 export const INITIAL_STARTER_BOOK: StoryBook = {
-  id: 'starter-book-01',
-  title: 'The Whispering Star Tree',
-  author: 'Leo & Luna',
+  id: 'storybook-blank-01',
+  title: 'My Story',
+  author: 'Young Storyteller',
   ageGroup: DEFAULT_AGE_GROUP,
   theme: DEFAULT_THEME,
-  pages: [
-    {
-      pageNumber: 1,
-      pageTitle: 'Chapter 1: The Golden Acorn',
-      storyText:
-        'Deep inside the mossy woods, Oliver the little hedgehog found an acorn that glowed like honey. Whenever he whispered a secret to it, the acorn chimed like tiny silver bells.',
-      illustrationPrompt:
-        'A cute hedgehog wearing a tiny woolen scarf holding a glowing golden acorn in a warm enchanted forest, soft watercolor and ink storybook illustration, cozy lighting, delicate botanical details.',
-      imageData:
-        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><rect width="100%" height="100%" fill="%23f2f0ea"/><circle cx="300" cy="300" r="140" fill="%23ede9fe"/><circle cx="300" cy="270" r="45" fill="%23d8b4fe"/><ellipse cx="300" cy="330" rx="65" ry="50" fill="%23a78bfa"/><circle cx="300" cy="340" r="18" fill="%23fbbf24"/><path d="M290 320 Q300 305 310 320" stroke="%234c1d95" stroke-width="3" fill="none"/><text x="300" y="470" font-family="serif" font-size="20" fill="%234f4d48" text-anchor="middle">Chapter 1: The Golden Acorn</text></svg>',
-      originalNarration:
-        'Once there was a little hedgehog named Oliver who found a shiny golden acorn in the woods that whispered back to him.',
-      characterBible:
-        'Oliver the hedgehog: small, round, wears a teal knitted scarf, big curious eyes.',
-    },
-    {
-      pageNumber: 2,
-      pageTitle: 'Chapter 2: The Starlight Owl',
-      storyText:
-        'Flapping down from the tallest oak came Barnaby the snowy owl. "That is no ordinary acorn," whispered Barnaby with wide golden eyes. "It belongs to the Great Star Tree!"',
-      illustrationPrompt:
-        'A wise snowy owl perching on a low autumn branch speaking to a little hedgehog with a glowing acorn, nighttime starlit sky, soft watercolor fable illustration, luminous stars.',
-      imageData:
-        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><rect width="100%" height="100%" fill="%23f2f0ea"/><circle cx="300" cy="300" r="140" fill="%23ede9fe"/><circle cx="330" cy="240" r="50" fill="%23c4b5fd"/><circle cx="315" cy="235" r="10" fill="%23fbbf24"/><circle cx="345" cy="235" r="10" fill="%23fbbf24"/><path d="M330 248 L325 258 L335 258 Z" fill="%23d97706"/><circle cx="250" cy="350" r="30" fill="%23a78bfa"/><text x="300" y="470" font-family="serif" font-size="20" fill="%234f4d48" text-anchor="middle">Chapter 2: The Starlight Owl</text></svg>',
-      originalNarration:
-        'Then an owl flew down and told Oliver that the acorn fell from the magic star tree high up on the mountain.',
-      characterBible:
-        'Oliver the hedgehog in teal scarf; Barnaby the wise snowy owl with golden spectacles.',
-    },
-  ],
+  pages: [],
   currentPageIndex: 0,
-  characterBible:
-    'Oliver the hedgehog (round, teal knitted scarf); Barnaby the snowy owl (golden eyes, wise expression).',
+  characterBible: '',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

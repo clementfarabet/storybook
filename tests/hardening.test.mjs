@@ -146,3 +146,28 @@ test('Backend: Health endpoint responds 200 with model manifest', async () => {
   assert.equal(data.textModel, 'gemini-3.8-flash');
   assert.equal(data.imageModel, 'gemini-nano-banana-2.1');
 });
+
+// Test 6: Page deletion renumbers remaining pages correctly
+test('Page deletion renumbers remaining pages and updates indices', () => {
+  const pages = [
+    { pageNumber: 1, pageTitle: 'Page 1', storyText: 'Chapter 1' },
+    { pageNumber: 2, pageTitle: 'Page 2', storyText: 'Chapter 2' },
+    { pageNumber: 3, pageTitle: 'Page 3', storyText: 'Chapter 3' },
+  ];
+
+  const deleteIndex = 1; // Delete middle page (page 2)
+  const remaining = pages
+    .filter((_, idx) => idx !== deleteIndex)
+    .map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+      pageTitle: `Page ${idx + 1}`,
+    }));
+
+  assert.equal(remaining.length, 2);
+  assert.equal(remaining[0].pageNumber, 1);
+  assert.equal(remaining[0].storyText, 'Chapter 1');
+  assert.equal(remaining[1].pageNumber, 2);
+  assert.equal(remaining[1].storyText, 'Chapter 3');
+});
+

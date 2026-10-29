@@ -88,7 +88,9 @@ export const Header: React.FC<HeaderProps> = ({
               }
             >
               <Mic className="w-3.5 h-3.5" />
-              <span style={{ color: viewMode === 'narrate' ? 'var(--paper)' : 'inherit' }}>Narrate</span>
+              <span style={{ color: viewMode === 'narrate' ? 'var(--paper)' : 'inherit' }}>
+                {book.pages.length === 0 ? 'Create' : 'Add Page'}
+              </span>
             </button>
           </nav>
         </div>

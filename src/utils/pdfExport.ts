@@ -189,7 +189,7 @@ export async function exportStoryBookToPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(140, 137, 129);
-    doc.text('learnandplay.ai · Powered by Gemini', pageWidth / 2, pageHeight - margin + 2, {
+    doc.text('learnandplay.ai · Storybook', pageWidth / 2, pageHeight - margin + 2, {
       align: 'center',
     });
   }

@@ -2,18 +2,18 @@
 State as of 2026-10-29: Live in production at https://learnandplay.ai/storybook/ with backend microservice running on clmt.ai.
 
 ## Latest
-- Built full voice-first storybook creation app for children under the learnandplay.ai suite.
+- App starts from a clean, blank book (`pages: []`), opening immediately into the Creative Studio.
+- Added page deletion with gentle confirmation modal, automatic renumbering, and fallback to Studio.
+- Made typed text a first-class creation mode alongside voice narration with live sync and idea starters.
 - Calibrated 4 age brackets (Toddler, Early Reader, Middle Grade, YA & Adult) adapting vocabulary and cadence.
 - Implemented visual theme selector & freeform creator with full book retheming (capped at 10 pages).
 - IndexedDB client storage engine (`storybook_db`) handles multi-megabyte illustrations without quota errors.
-- Square keepsake PDF export (8.5" × 8.5" / 210×210 mm) with canvas rasterization and Unicode normalization.
-- Full quality & ship gates passed: 0 critic findings, 0 visual inspection issues, 5/5 automated hardening tests passing.
 
 ## Run, test, ship
 - Dev frontend: `npm run dev` (Vite on http://localhost:5175/)
 - Backend server: `npm run server` (Node on http://127.0.0.1:8794/)
 - Typecheck: `npx tsc --noEmit` (0 errors)
-- Automated tests: `npm test` (5/5 tests passing)
+- Automated tests: `npm test` (6/6 tests passing)
 - Production build: `npm run build` (dist/ bundled in ~1.0s)
 - Production deploy: `npm run deploy` (syncs to clmt.ai:/var/www/learnandplay/storybook)
 - Live URL: https://learnandplay.ai/storybook/

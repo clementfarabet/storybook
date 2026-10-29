@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Sparkles, Volume2, Edit3, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Volume2, Edit3, AlertCircle, PenLine, Lightbulb } from 'lucide-react';
 import { LiveAudioRecorder } from '../utils/audio';
 import { Theme, AgeGroup } from '../types';
 
@@ -13,6 +13,21 @@ interface NarrationStudioProps {
   onCancel?: () => void;
 }
 
+const AGE_PLACEHOLDERS: Record<string, string> = {
+  toddler: 'E.g. A tiny puppy found a big blue ball and bounced happily across the soft green grass!',
+  'early-reader': 'E.g. Oliver the hedgehog discovered a glowing acorn that chimed like bells whenever he whispered a secret.',
+  'middle-grade': 'E.g. Behind the waterfall lay a secret library carved from amethyst crystal, where clockwork owls guarded ancient maps.',
+  'ya-adult': 'E.g. The lantern flared with violet flame as the celestial tide began to rise across the salt flats of Oakhaven.',
+};
+
+const STORY_STARTERS = [
+  'Once upon a time',
+  'Deep in the enchanted woods',
+  'High above the clouds',
+  'Suddenly, a mysterious sound',
+  'Down by the sparkling river',
+];
+
 export const NarrationStudio: React.FC<NarrationStudioProps> = ({
   pageNumber,
   theme,
@@ -22,6 +37,7 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
   isGenerating,
   onCancel,
 }) => {
+  const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [audioPayload, setAudioPayload] = useState<{ base64: string; mime: string } | null>(null);
@@ -80,18 +96,29 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
     }
   };
 
+  const handleAddStarter = (starterText: string) => {
+    setTranscript((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed} ${starterText}` : `${starterText}, `;
+    });
+  };
+
   const handleCreatePage = async () => {
     if (isSubmittingRef.current || isGenerating) return;
     const trimmed = transcript.trim();
     if (!trimmed && !audioPayload) {
-      setErrorMessage('Please narrate or type a chunk of your story first!');
+      setErrorMessage(
+        inputMode === 'voice'
+          ? 'Please speak your story or switch to typing!'
+          : 'Please write a sentence or two for your story page!'
+      );
       return;
     }
 
     setErrorMessage(null);
     isSubmittingRef.current = true;
     try {
-      // SC4: Only send raw audio when text narration is absent
+      // Only send raw audio when text narration is absent
       await onGeneratePage(
         trimmed,
         trimmed ? undefined : audioPayload?.base64,
@@ -102,154 +129,246 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
     }
   };
 
+  const wordCount = transcript.trim() ? transcript.trim().split(/\s+/).length : 0;
+
   return (
     <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-5 sm:p-6 shadow-xs space-y-6">
       {/* Studio Header */}
-      <div className="flex items-center justify-between border-b border-[var(--rule)] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--rule)] pb-4">
         <div>
           <span className="text-xs font-mono uppercase tracking-wider text-[var(--ink-3)]">
-            Page {pageNumber} · Voice Studio
+            Page {pageNumber} · Creative Studio
           </span>
           <h2 className="font-serif text-xl sm:text-2xl font-medium text-[var(--ink)] tracking-tight mt-0.5">
-            {pageNumber === 1 ? 'Start Your Adventure' : `Narrate Page ${pageNumber}`}
+            {pageNumber === 1 ? 'Start Your Adventure' : `Create Page ${pageNumber}`}
           </h2>
         </div>
 
-        {theme?.name && (
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--paper-2)] border border-[var(--rule)] text-xs text-[var(--ink-2)]">
-            <span className="font-sans font-medium">{theme.name} Style</span>
-          </div>
-        )}
-      </div>
-
-      {/* Main Recording Interactive Arena */}
-      <div className="flex flex-col items-center justify-center py-6 sm:py-8 bg-[var(--paper-2)]/60 rounded-xl border border-[var(--rule)] relative overflow-hidden">
-        {/* Pulsing Visualizer Rings */}
-        {isRecording && (
-          <div
-            className="absolute rounded-full pointer-events-none transition-all duration-75"
-            style={{
-              width: `${120 + volumeLevel * 180}px`,
-              height: `${120 + volumeLevel * 180}px`,
-              background: 'var(--accent)',
-              opacity: Math.min(0.25, volumeLevel * 0.4),
-              filter: 'blur(20px)',
-            }}
-          />
-        )}
-
-        <div className="relative z-10 flex flex-col items-center text-center px-4">
+        {/* Input Mode Selector: Voice vs Typed */}
+        <nav
+          role="tablist"
+          aria-label="Story input method"
+          className="inline-flex items-center rounded-full p-1 border border-[var(--rule)] bg-[var(--paper-2)] shrink-0 self-start sm:self-auto"
+        >
           <button
             type="button"
-            onClick={toggleRecording}
-            disabled={isGenerating}
-            className={`btn-accent relative w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center shadow-md transition-transform duration-200 transform active:scale-95 cursor-pointer ${
-              isRecording
-                ? 'bg-rose-600 text-white'
-                : 'bg-[var(--accent)] hover:opacity-95 text-[var(--accent-contrast)]'
-            }`}
-            title={isRecording ? 'Click to stop narrating' : 'Click to start narrating'}
-            aria-label={isRecording ? 'Stop voice recording' : 'Start voice recording'}
+            role="tab"
+            aria-selected={inputMode === 'voice'}
+            onClick={() => setInputMode('voice')}
+            className="min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            style={{
+              backgroundColor: inputMode === 'voice' ? 'var(--ink)' : 'transparent',
+              color: inputMode === 'voice' ? 'var(--paper)' : 'var(--ink-2)',
+            }}
           >
-            {isRecording ? (
-              <>
-                <MicOff className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse text-white" />
-                <span className="text-xs font-semibold mt-1 uppercase tracking-wide text-white">
-                  Listening…
-                </span>
-              </>
-            ) : (
-              <>
-                <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-[var(--accent-contrast)]" />
-                <span className="text-xs font-semibold mt-1 uppercase tracking-wide text-[var(--accent-contrast)]">
-                  {transcript ? 'Speak More' : 'Tap to Speak'}
-                </span>
-              </>
-            )}
+            <Mic className="w-3.5 h-3.5" />
+            <span style={{ color: inputMode === 'voice' ? 'var(--paper)' : 'inherit' }}>Voice</span>
           </button>
 
-          <p className="text-xs text-[var(--ink-2)] mt-4 max-w-sm">
-            {isRecording
-              ? 'Tell what happens next! Describe characters, animals, and surprises.'
-              : transcript
-              ? 'Great narration! You can tap above to add more, or edit your words below.'
-              : 'Tap the purple microphone and tell your story chunk out loud.'}
-          </p>
-        </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={inputMode === 'text'}
+            onClick={() => setInputMode('text')}
+            className="min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            style={{
+              backgroundColor: inputMode === 'text' ? 'var(--ink)' : 'transparent',
+              color: inputMode === 'text' ? 'var(--paper)' : 'var(--ink-2)',
+            }}
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            <span style={{ color: inputMode === 'text' ? 'var(--paper)' : 'inherit' }}>Type Text</span>
+          </button>
+        </nav>
       </div>
 
-      {/* Spoken Narration Transcript & Direct Text Input Fallback */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5 text-[var(--accent)]" />
-            Your Story Words
-          </label>
-          {transcript && !isRecording && (
-            <button
-              type="button"
-              onClick={() => setIsEditingTranscript(!isEditingTranscript)}
-              className="min-h-[44px] px-2.5 py-1 text-xs text-[var(--ink-2)] hover:text-[var(--accent)] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>{isEditingTranscript ? 'Done Editing' : 'Edit Words'}</span>
-            </button>
-          )}
-        </div>
+      {/* Mode A: Voice Studio */}
+      {inputMode === 'voice' ? (
+        <>
+          {/* Main Recording Interactive Arena */}
+          <div className="flex flex-col items-center justify-center py-6 sm:py-8 bg-[var(--paper-2)]/60 rounded-xl border border-[var(--rule)] relative overflow-hidden">
+            {/* Pulsing Visualizer Rings */}
+            {isRecording && (
+              <div
+                className="absolute rounded-full pointer-events-none transition-all duration-75"
+                style={{
+                  width: `${120 + volumeLevel * 180}px`,
+                  height: `${120 + volumeLevel * 180}px`,
+                  background: 'var(--accent)',
+                  opacity: Math.min(0.25, volumeLevel * 0.4),
+                  filter: 'blur(20px)',
+                }}
+              />
+            )}
 
-        {isEditingTranscript ? (
-          <textarea
-            value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
-            rows={3}
-            className="w-full p-3 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-hidden resize-none font-serif leading-relaxed"
-            placeholder="Edit your story narration here..."
-            aria-label="Story narration text"
-          />
-        ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="Edit spoken narration"
-            onClick={() => !isRecording && setIsEditingTranscript(true)}
-            onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ' ') && !isRecording) {
-                e.preventDefault();
-                setIsEditingTranscript(true);
-              }
-            }}
-            className={`min-h-[4.5rem] p-3 rounded-xl border transition-colors cursor-pointer ${
-              transcript
-                ? 'bg-[var(--paper-2)] border-[var(--rule)] text-[var(--ink)]'
-                : 'bg-[var(--paper-2)]/50 border-dashed border-[var(--rule)] text-[var(--ink-3)]'
-            }`}
-          >
-            {transcript ? (
-              <p className="font-serif text-sm sm:text-base leading-relaxed text-[var(--ink)]">
-                "{transcript}"
-              </p>
-            ) : (
-              <p className="text-xs italic text-[var(--ink-3)]">
+            <div className="relative z-10 flex flex-col items-center text-center px-4">
+              <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={isGenerating}
+                className={`btn-accent relative w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center shadow-md transition-transform duration-200 transform active:scale-95 cursor-pointer ${
+                  isRecording
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-[var(--accent)] hover:opacity-95 text-[var(--accent-contrast)]'
+                }`}
+                title={isRecording ? 'Click to stop narrating' : 'Click to start narrating'}
+                aria-label={isRecording ? 'Stop voice recording' : 'Start voice recording'}
+              >
+                {isRecording ? (
+                  <>
+                    <MicOff className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse text-white" />
+                    <span className="text-xs font-semibold mt-1 uppercase tracking-wide text-white">
+                      Listening…
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-[var(--accent-contrast)]" />
+                    <span className="text-xs font-semibold mt-1 uppercase tracking-wide text-[var(--accent-contrast)]">
+                      {transcript ? 'Speak More' : 'Tap to Speak'}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-[var(--ink-2)] mt-4 max-w-sm">
                 {isRecording
-                  ? 'Listening for your voice… words will appear here as you speak!'
-                  : 'Or tap here to type your story directly if you prefer typing over voice.'}
+                  ? 'Tell what happens next! Describe characters, animals, and surprises.'
+                  : transcript
+                  ? 'Great narration! Tap above to add more, or switch to "Type Text" to edit.'
+                  : 'Tap the purple microphone and tell your story chunk out loud.'}
               </p>
+            </div>
+          </div>
+
+          {/* Spoken Narration Transcript & Direct Text Input Fallback */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+                Spoken Words
+              </label>
+              {transcript && !isRecording && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTranscript(!isEditingTranscript)}
+                  className="min-h-[44px] px-2.5 py-1 text-xs text-[var(--ink-2)] hover:text-[var(--accent)] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isEditingTranscript ? 'Done Editing' : 'Edit Words'}</span>
+                </button>
+              )}
+            </div>
+
+            {isEditingTranscript ? (
+              <textarea
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                rows={3}
+                className="w-full p-3 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-hidden resize-none font-serif leading-relaxed"
+                placeholder="Edit your story narration here..."
+                aria-label="Story narration text"
+              />
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Edit spoken narration"
+                onClick={() => !isRecording && setIsEditingTranscript(true)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && !isRecording) {
+                    e.preventDefault();
+                    setIsEditingTranscript(true);
+                  }
+                }}
+                className={`min-h-[4.5rem] p-3 rounded-xl border transition-colors cursor-pointer ${
+                  transcript
+                    ? 'bg-[var(--paper-2)] border-[var(--rule)] text-[var(--ink)]'
+                    : 'bg-[var(--paper-2)]/50 border-dashed border-[var(--rule)] text-[var(--ink-3)]'
+                }`}
+              >
+                {transcript ? (
+                  <p className="font-serif text-sm sm:text-base leading-relaxed text-[var(--ink)]">
+                    "{transcript}"
+                  </p>
+                ) : (
+                  <p className="text-xs italic text-[var(--ink-3)]">
+                    {isRecording
+                      ? 'Listening for your voice… words will appear here as you speak!'
+                      : 'Words you speak appear here. You can also switch to "Type Text" above to write directly.'}
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </>
+      ) : (
+        /* Mode B: Direct Text Studio */
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="story-text-input"
+                className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5"
+              >
+                <PenLine className="w-3.5 h-3.5 text-[var(--accent)]" />
+                Write Your Story
+              </label>
+              <span className="text-xs font-mono text-[var(--ink-3)]">
+                {wordCount} {wordCount === 1 ? 'word' : 'words'}
+              </span>
+            </div>
 
-        {errorMessage && (
-          <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>{errorMessage}</span>
-          </p>
-        )}
+            <textarea
+              id="story-text-input"
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleCreatePage();
+                }
+              }}
+              rows={5}
+              placeholder={AGE_PLACEHOLDERS[ageGroup || 'early-reader'] || AGE_PLACEHOLDERS['early-reader']}
+              className="w-full p-4 rounded-xl bg-[var(--paper-2)] border border-[var(--rule)] text-base font-serif text-[var(--ink)] placeholder:text-[var(--ink-3)]/60 focus:border-[var(--accent)] focus:outline-hidden leading-relaxed resize-y transition-colors"
+              aria-label="Story page written text"
+            />
+          </div>
 
-        {/* Privacy Note (SC6 & SC8) */}
-        <p className="text-xs text-[var(--ink-3)] italic">
-          Tip: Voice recognition runs securely in your browser. Use first names or playful pen names to keep your child's identity private.
+          {/* Quick Idea Starters */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1 text-xs text-[var(--ink-3)]">
+              <Lightbulb className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <span>Need an idea to get started?</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {STORY_STARTERS.map((starter) => (
+                <button
+                  key={starter}
+                  type="button"
+                  onClick={() => handleAddStarter(starter)}
+                  className="min-h-[44px] sm:min-h-0 px-3 py-1.5 rounded-full text-xs bg-[var(--paper-2)] hover:bg-[var(--paper-3)] border border-[var(--rule)] text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors cursor-pointer"
+                >
+                  + {starter}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorMessage && (
+        <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span>{errorMessage}</span>
         </p>
-      </div>
+      )}
+
+      {/* Privacy & Child Safety Note */}
+      <p className="text-xs text-[var(--ink-3)] italic">
+        Tip: All creations are calibrated for young storytellers. Gemini transforms your words into a hardcover storybook page with custom artwork.
+      </p>
 
       {/* Primary Action Button */}
       <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
@@ -286,3 +405,4 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
     </div>
   );
 };
+

@@ -7,7 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { PdfExportModal } from './components/PdfExportModal';
 import { StoryBook, Theme, AgeGroup, StoryPage } from './types';
 import { DEFAULT_THEME, DEFAULT_AGE_GROUP, STORAGE_KEY, AGE_GROUPS, INITIAL_STARTER_BOOK } from './constants';
-import { Sparkles, BookOpen, Mic, Edit3, ArrowLeft } from 'lucide-react';
+import { Sparkles, BookOpen, Mic, Edit3, ArrowLeft, Trash2 } from 'lucide-react';
 import { saveBookToStorage, loadBookFromStorage, sanitizeStoryBook } from './utils/storage';
 
 export const App: React.FC = () => {
@@ -40,14 +40,16 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'read' | 'narrate'>(() => {
     try {
       const param = new URLSearchParams(window.location.search).get('view');
+      if (param === 'read') return 'read';
       if (param === 'narrate') return 'narrate';
     } catch (_) {}
-    return 'read';
+    return 'narrate';
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isNewStoryConfirmOpen, setIsNewStoryConfirmOpen] = useState(false);
+  const [pageToDelete, setPageToDelete] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRetheming, setIsRetheming] = useState(false);
   const [isRegeneratingImage, setIsRegeneratingImage] = useState(false);
@@ -63,10 +65,22 @@ export const App: React.FC = () => {
   }, [themeMode]);
 
   // Load initial book from IndexedDB (or fallback) (SC2)
+  // Always start from a blank book if fresh or if previously on mock starter book
   useEffect(() => {
     loadBookFromStorage().then((stored) => {
       if (stored && Array.isArray(stored.pages)) {
-        setBook(stored);
+        if (stored.id === 'starter-book-01') {
+          // Reset mock starter to a clean blank book
+          setBook(INITIAL_STARTER_BOOK);
+          setViewMode('narrate');
+        } else {
+          setBook(stored);
+          if (stored.pages.length === 0) {
+            setViewMode('narrate');
+          }
+        }
+      } else {
+        setViewMode('narrate');
       }
     });
   }, []);
@@ -305,6 +319,40 @@ export const App: React.FC = () => {
     showToast('Ready for a brand new adventure!');
   };
 
+  const handleConfirmDeletePage = () => {
+    if (pageToDelete === null) return;
+    const deletedNum = pageToDelete + 1;
+
+    setBook((prev) => {
+      const remainingPages = prev.pages
+        .filter((_, idx) => idx !== pageToDelete)
+        .map((p, idx) => ({
+          ...p,
+          pageNumber: idx + 1,
+          pageTitle: p.pageTitle.startsWith('Page ') ? `Page ${idx + 1}` : p.pageTitle,
+        }));
+
+      const newIndex = Math.min(
+        Math.max(0, pageToDelete <= prev.currentPageIndex ? prev.currentPageIndex - 1 : prev.currentPageIndex),
+        Math.max(0, remainingPages.length - 1)
+      );
+
+      return {
+        ...prev,
+        pages: remainingPages,
+        currentPageIndex: newIndex,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    if (book.pages.length <= 1) {
+      setViewMode('narrate');
+    }
+
+    setPageToDelete(null);
+    showToast(`Page ${deletedNum} deleted`);
+  };
+
   const currentAgeConfig =
     AGE_GROUPS.find((a) => a.id === book.ageGroup) || AGE_GROUPS[1];
 
@@ -420,6 +468,7 @@ export const App: React.FC = () => {
               onUpdatePageText={handleUpdatePageText}
               onRegeneratePageImage={handleRegeneratePageImage}
               isRegeneratingImage={isRegeneratingImage}
+              onDeletePage={(idx) => setPageToDelete(idx)}
             />
 
             {/* Bottom Page Thumbnails Carousel */}
@@ -467,6 +516,41 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Gentle In-App Page Deletion Confirmation Modal */}
+      {pageToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--scrim)] backdrop-blur-xs animate-fade-in">
+          <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-6 max-w-sm w-full shadow-xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center bg-rose-500/10 text-rose-600">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-serif text-xl font-medium text-[var(--ink)]">
+                Delete Page {pageToDelete + 1}?
+              </h3>
+              <p className="text-xs text-[var(--ink-2)] leading-relaxed">
+                This will permanently remove this page and its illustration. The remaining pages will be renumbered.
+              </p>
+            </div>
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPageToDelete(null)}
+                className="flex-1 min-h-[44px] px-4 py-2.5 rounded-full border border-[var(--rule)] bg-[var(--paper-2)] text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--paper-3)] transition-colors cursor-pointer"
+              >
+                Keep Page
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePage}
+                className="flex-1 min-h-[44px] px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+              >
+                Delete Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Side drawer for Theme & Age */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -503,8 +587,11 @@ export const App: React.FC = () => {
               </a>
             </div>
           </div>
-          <div className="text-xs italic" style={{ color: 'var(--ink-3)' }}>
-            Powered by Gemini AI · Ready to print, share, or bind.
+          <div
+            className="text-xs italic"
+            style={{ color: 'var(--ink-3)' }}
+          >
+            Disclaimer: These projects are built for fun — take all AI-generated results and syntheses with a grain of salt.
           </div>
         </div>
       </footer>

@@ -10,6 +10,7 @@ import {
   Check,
   RotateCcw,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 import { StoryBook, StoryPage, AgeGroup } from '../types';
 import { AGE_GROUPS } from '../constants';
@@ -23,6 +24,7 @@ interface BookSpreadProps {
   onUpdatePageText: (pageIndex: number, newText: string) => void;
   onRegeneratePageImage: (pageIndex: number) => Promise<void>;
   isRegeneratingImage: boolean;
+  onDeletePage?: (pageIndex: number) => void;
 }
 
 export const BookSpread: React.FC<BookSpreadProps> = ({
@@ -33,6 +35,7 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
   onUpdatePageText,
   onRegeneratePageImage,
   isRegeneratingImage,
+  onDeletePage,
 }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -184,6 +187,19 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
             <Edit2 className="w-4 h-4" />
             <span className="hidden sm:inline">Edit Text</span>
           </button>
+
+          {onDeletePage && (
+            <button
+              type="button"
+              onClick={() => onDeletePage(currentPageIndex)}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--rule)] bg-[var(--paper)] text-[var(--ink-2)] hover:text-rose-600 hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors text-xs cursor-pointer"
+              title="Delete this page"
+              aria-label={`Delete Page ${currentPageIndex + 1}`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
+              <span className="hidden sm:inline">Delete</span>
+            </button>
+          )}
         </div>
       </div>
 
