@@ -87,6 +87,8 @@ async function transcribeAudio(audioBase64, mimeType = 'audio/webm') {
     model: TEXT_MODEL,
     generation_config: {
       temperature: 0.0,
+      thinking_level: 'low',
+      max_output_tokens: 2048,
     },
     input: [
       {
@@ -101,6 +103,96 @@ async function transcribeAudio(audioBase64, mimeType = 'audio/webm') {
     ],
   });
   return interaction.output_text?.trim() || '';
+}
+
+function sanitizePageResult(obj, childNarration, pageNumber) {
+  const storyText = String(obj.storyText || '').trim() || childNarration.trim() || 'A new chapter begins.';
+  return {
+    bookTitle: String(obj.bookTitle || 'My Storybook').trim(),
+    pageTitle: String(obj.pageTitle || `Page ${pageNumber}`).trim(),
+    storyText,
+    illustrationPrompt: String(obj.illustrationPrompt || `${storyText}. Storybook illustration, pure visual art.`).trim(),
+    characterBible: String(obj.characterBible || '').trim(),
+  };
+}
+
+export function robustParseStoryResponse(rawText, childNarration = '', pageNumber = 1) {
+  if (!rawText || typeof rawText !== 'string') {
+    return {
+      bookTitle: 'My Storybook',
+      pageTitle: `Page ${pageNumber}`,
+      storyText: childNarration.trim() || 'A new chapter begins in our magical journey.',
+      illustrationPrompt: `A beautiful storybook illustration depicting: ${childNarration.trim() || 'A magical adventure'}. Gentle watercolor and ink style, pure visual art.`,
+      characterBible: '',
+    };
+  }
+
+  // 1. Strip markdown fences anywhere in the string
+  let clean = rawText.trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  // 2. Direct JSON parse
+  try {
+    const direct = JSON.parse(clean);
+    if (direct && typeof direct === 'object') return sanitizePageResult(direct, childNarration, pageNumber);
+  } catch (_) {}
+
+  // 3. Extract outermost { ... }
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[0]);
+      if (parsed && typeof parsed === 'object') return sanitizePageResult(parsed, childNarration, pageNumber);
+    } catch (_) {
+      // 4. Sanitize unescaped newlines/tabs inside quotes and trailing commas
+      try {
+        const sanitized = match[0]
+          .replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (_, content) => `"${content.replace(/\r?\n/g, '\\n').replace(/\t/g, '\\t')}"`)
+          .replace(/,\s*([}\]])/g, '$1');
+        const parsed = JSON.parse(sanitized);
+        if (parsed && typeof parsed === 'object') return sanitizePageResult(parsed, childNarration, pageNumber);
+      } catch (_) {}
+    }
+  }
+
+  // 5. Robust regex field extraction fallback
+  const extractField = (key) => {
+    const reg = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'i');
+    const m = clean.match(reg);
+    if (m && m[1]) {
+      return m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+    }
+    return '';
+  };
+
+  const bookTitle = extractField('bookTitle');
+  const pageTitle = extractField('pageTitle') || `Page ${pageNumber}`;
+  const storyText = extractField('storyText');
+  const illustrationPrompt = extractField('illustrationPrompt');
+  const characterBible = extractField('characterBible');
+
+  if (storyText) {
+    return {
+      bookTitle: bookTitle || 'My Storybook',
+      pageTitle,
+      storyText,
+      illustrationPrompt: illustrationPrompt || `${storyText}. Storybook illustration, pure visual art.`,
+      characterBible: characterBible || '',
+    };
+  }
+
+  // 6. Graceful fallback: Never crash the child's story creation experience
+  console.warn('[Storybook Server] Fallback parser used for raw response:', clean.slice(0, 150));
+  const fallbackText = childNarration.trim() || 'A new chapter begins in our magical journey.';
+  return {
+    bookTitle: 'My Storybook',
+    pageTitle: `Page ${pageNumber}`,
+    storyText: fallbackText,
+    illustrationPrompt: `A whimsical storybook illustration depicting: ${fallbackText.slice(0, 200)}. Pure visual art, wordless picture book art.`,
+    characterBible: '',
+  };
 }
 
 // Generate Page Content (prose + illustration prompt)
@@ -172,26 +264,16 @@ Generate the JSON story page:`;
     model: TEXT_MODEL,
     system_instruction: systemInstruction,
     input: userPrompt,
+    response_format: { type: 'text', mime_type: 'application/json' },
     generation_config: {
       temperature: 0.7,
-      max_output_tokens: 1024,
+      thinking_level: 'low',
+      max_output_tokens: 4096,
     },
   });
 
-  let rawJson = interaction.output_text?.trim() || '{}';
-  // Strip markdown fences anywhere in the string
-  rawJson = rawJson.replace(/^[\s\S]*?```(?:json)?\s*/i, '').replace(/```[\s\S]*$/, '').trim();
-  try {
-    return JSON.parse(rawJson);
-  } catch (err) {
-    console.warn('[Storybook Server] Initial JSON parse failed, attempting regex sanitization:', err.message);
-    const match = rawJson.match(/\{[\s\S]*\}/);
-    if (match) {
-      const sanitized = match[0].replace(/[\u0000-\u001F\u007F-\u009F]/g, (c) => (c === '\n' ? '\\n' : c === '\r' ? '\\r' : c === '\t' ? '\\t' : ''));
-      return JSON.parse(sanitized);
-    }
-    throw new Error('Could not parse story generation response');
-  }
+  const rawJson = interaction.output_text?.trim() || '';
+  return robustParseStoryResponse(rawJson, safeNarration, pageNumber);
 }
 
 // Generate Image with Nano Banana 2.1 (PE2: pure visual storytelling, no negative buzzwords)
@@ -374,7 +456,8 @@ const server = http.createServer(async (req, res) => {
           model: TEXT_MODEL,
           generation_config: {
             temperature: 0.5,
-            max_output_tokens: 512,
+            thinking_level: 'low',
+            max_output_tokens: 2048,
           },
           system_instruction: `You are an art director restyling an illustrated children's book.
 Transform the existing scene description into the new visual theme: "${themeStyle}".
@@ -433,7 +516,10 @@ Return ONLY the updated illustration prompt as plain text. No quotes, no markdow
   sendJson(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Storybook Server] Running on http://127.0.0.1:${PORT}`);
-  console.log(`[Storybook Server] Text model: ${TEXT_MODEL}, Image model: ${IMAGE_MODEL}`);
-});
+const isMain = process.argv[1] && (process.argv[1].endsWith('storybookServer.mjs') || process.argv[1].endsWith('storybookServer'));
+if (isMain) {
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`[Storybook Server] Running on http://127.0.0.1:${PORT}`);
+    console.log(`[Storybook Server] Text model: ${TEXT_MODEL}, Image model: ${IMAGE_MODEL}`);
+  });
+}

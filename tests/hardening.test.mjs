@@ -171,3 +171,35 @@ test('Page deletion renumbers remaining pages and updates indices', () => {
   assert.equal(remaining[1].storyText, 'Chapter 3');
 });
 
+// Test 7: Robust JSON response parsing and graceful fallbacks (WH13)
+test('WH13: robustParseStoryResponse parses valid, markdown-wrapped, unescaped, and cut-off JSON without throwing', async () => {
+  const { robustParseStoryResponse } = await import('../server/storybookServer.mjs');
+
+  // Case 1: Pure valid JSON
+  const r1 = robustParseStoryResponse('{"bookTitle": "Dragon Tale", "pageTitle": "Chapter 1", "storyText": "Once upon a time."}');
+  assert.equal(r1.bookTitle, 'Dragon Tale');
+  assert.equal(r1.storyText, 'Once upon a time.');
+
+  // Case 2: Markdown wrapped JSON
+  const r2 = robustParseStoryResponse('```json\n{"bookTitle": "Stars", "storyText": "The sky glowed."}\n```');
+  assert.equal(r2.bookTitle, 'Stars');
+  assert.equal(r2.storyText, 'The sky glowed.');
+
+  // Case 3: Unescaped raw newlines inside string
+  const r3 = robustParseStoryResponse('{\n"bookTitle": "Forest",\n"storyText": "Line one.\nLine two."\n}');
+  assert.equal(r3.bookTitle, 'Forest');
+  assert.ok(r3.storyText.includes('Line one.'));
+
+  // Case 4: Truncated JSON where storyText was output before cut-off
+  const r4 = robustParseStoryResponse('{"bookTitle": "Adventures", "storyText": "Here is the story", "illust', 'Fallback text');
+  assert.equal(r4.bookTitle, 'Adventures');
+  assert.equal(r4.storyText, 'Here is the story');
+
+  // Case 5: Complete garbage / non-JSON string
+  const r5 = robustParseStoryResponse('Sorry, I cannot help with that right now.', 'The brave knight found a key', 2);
+  assert.equal(r5.pageTitle, 'Page 2');
+  assert.equal(r5.storyText, 'The brave knight found a key');
+  assert.ok(r5.illustrationPrompt.includes('The brave knight found a key'));
+});
+
+
