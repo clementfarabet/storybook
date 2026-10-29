@@ -1,0 +1,241 @@
+/* clmt.ai house style: tokens, base, the two voices and the basic controls.
+   Values from MADclmt src/styles.css (shipped, 28 Oct 2026). Two departures, both from MADpolis:
+   - the kicker is 0.75rem (12px), LA's floor for captions on phones; clmt.ai sets 0.6875rem;
+   - dark --rule is declared once (#3a3733); clmt.ai declares it twice and the second wins.
+   Colour rules (the stricter bar):
+   - paper and ink only; the accent marks the visitor and their own actions, nothing else;
+   - rule is for hairlines, never text or a data mark;
+   - no glows, pills, badges, extra hues or decorative gradients (a paper fade that shows text
+     scrolls on is the one gradient allowed).
+   Import fonts.css first, then this file. */
+
+:root {
+  --paper: #fbfaf7;
+  --paper-2: #f2f0ea;
+  --paper-3: #e9e6de;
+  --ink: #1b1a18;
+  --ink-2: #4f4d48;
+  --ink-3: #6c6963;
+  --rule: #e3e0d9;
+  --accent: #6d28d9;
+  --accent-soft: #ede9fe;
+  --accent-contrast: #ffffff;
+  --scrim: rgba(27, 26, 24, 0.32);
+
+  --serif: 'Newsreader', 'Newsreader Fallback', Georgia, 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --fs-body: clamp(1.125rem, 1.02rem + 0.5vw, 1.375rem);
+  --lh-body: 1.5;
+  --fs-title: clamp(1.375rem, 1.2rem + 0.8vw, 1.875rem);
+  --fs-kicker: 0.75rem;
+  --fs-frame: 0.9375rem;
+  --fs-numeral: clamp(4.25rem, min(30vw, 19vh), 11rem);
+  --fs-thesis: clamp(1.625rem, 1.25rem + 1.9vw, 2.75rem);
+  --measure: 34rem;
+  --gutter: clamp(1.5rem, 6vw, 3rem);
+  --top: calc(env(safe-area-inset-top) + 2.75rem);
+  --bottom: calc(env(safe-area-inset-bottom) + 3.25rem);
+  --side: 17rem;
+
+  --radius-well: 18px;
+  --radius-control: 14px;
+  --radius-segment: 10px;
+  --radius-sheet: 22px;
+  --radius-focus: 4px;
+
+  /* Motion grammar, named by intent. Nothing here is linear. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);        /* arrival: sheet, settles. Long decel, no overshoot */
+  --ease-snap: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* small state changes and fades */
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);           /* leaving: accelerate away, still moving at the edge */
+  --dur-snap: 160ms;
+  --dur-fade: 280ms;
+  --dur-sheet-in: 380ms;
+  --dur-sheet-out: 240ms;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #121211; --paper-2: #1c1b19; --paper-3: #26241f;
+    --ink: #eceae4; --ink-2: #aeaba4; --ink-3: #8c8981; --rule: #3a3733;
+    --accent: #a78bfa; --accent-soft: #2a2340; --accent-contrast: #121211; --scrim: rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --paper: #121211; --paper-2: #1c1b19; --paper-3: #26241f;
+  --ink: #eceae4; --ink-2: #aeaba4; --ink-3: #8c8981; --rule: #3a3733;
+  --accent: #a78bfa; --accent-soft: #2a2340; --accent-contrast: #121211; --scrim: rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* The measure and type grow with the frame. */
+@media (min-width: 600px) {
+  :root { --measure: 36rem; --fs-body: clamp(1.1875rem, 1.05rem + 0.55vw, 1.4375rem); --fs-numeral: clamp(4.25rem, min(24vw, 22vh), 14rem); }
+}
+@media (min-width: 900px) {
+  :root { --measure: 38rem; --fs-body: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem); --fs-kicker: 0.8125rem; }
+}
+@media (max-height: 600px) {
+  :root { --top: calc(env(safe-area-inset-top) + 2.25rem); }
+}
+
+/* Chinese and Japanese: system CJK faces first, so CJK punctuation stays CJK; nothing is downloaded. */
+:lang(zh) {
+  --serif: 'Songti SC', 'STSong', 'Noto Serif SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', 'Newsreader', 'Newsreader Fallback', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --lh-body: 1.7;
+}
+:lang(ja) {
+  --serif: 'Hiragino Mincho ProN', 'Hiragino Mincho Pro', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', 'Noto Serif CJK JP', 'Source Han Serif JP', 'Newsreader', 'Newsreader Fallback', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'YuGothic', 'Meiryo', system-ui, sans-serif;
+  --lh-body: 1.7;
+  line-break: strict;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  background-color: var(--paper);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  font-synthesis-weight: none;
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration-color: var(--ink-3); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+::selection { background-color: var(--accent-soft); color: var(--ink); }
+/* One ring for every control, never on mouse click. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--radius-focus); }
+[tabindex='-1']:focus { outline: none; }
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── The two voices ───────────────────────────────────────────────────────── */
+/* The owner's words: serif, verbatim. Size with a role: `voice-record body` or `voice-record land`. */
+.voice-record {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  text-wrap: pretty;
+  hanging-punctuation: first;
+  hyphens: manual;
+}
+/* Ours: the interface. Resets inside a record. */
+.voice-ui { font-family: var(--sans); font-optical-sizing: auto; hanging-punctuation: none; }
+
+.body { font-size: var(--fs-body); line-height: var(--lh-body); }
+.body p { margin: 0 0 0.85em; }
+.body p:last-child { margin-bottom: 0; }
+.land { font-size: calc(var(--fs-body) * 1.28); line-height: 1.32; letter-spacing: -0.01em; text-wrap: balance; }
+.cover-title { font-family: var(--serif); font-weight: 400; font-size: clamp(2.1rem, 1.5rem + 3.2vw, 4rem); line-height: 1.02; letter-spacing: -0.022em; margin: 0; text-wrap: balance; }
+.title { font: 600 var(--fs-title) / 1.18 var(--sans); letter-spacing: -0.018em; margin: 0 0 1rem; text-wrap: balance; }
+.prompt { font: 600 1.1875rem / 1.3 var(--sans); letter-spacing: -0.012em; text-wrap: balance; }
+.kicker { font: 600 var(--fs-kicker) / 1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.kicker:where(:lang(zh), :lang(ja)) { text-transform: none; letter-spacing: 0; }
+.frame { font: 400 var(--fs-frame) / 1.45 var(--sans); color: var(--ink-2); border-left: 2px solid var(--rule); padding: 0.1rem 0 0.1rem 0.85rem; }
+.meta { font: 400 0.875rem / 1.4 var(--sans); color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ── Page column ──────────────────────────────────────────────────────────── */
+.doc {
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 4.5rem) var(--gutter) calc(env(safe-area-inset-bottom) + 6rem);
+}
+
+/* ── Controls (the stricter bar: 14px radius, no pills) ───────────────────── */
+.btn {
+  appearance: none; border: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 44px; padding: 0.5rem 1.1rem; border-radius: var(--radius-control);
+  background: var(--paper-2); color: var(--ink);
+  font: 600 0.9375rem / 1.25 var(--sans); text-decoration: none;
+  transition: transform var(--dur-snap) var(--ease-out), background-color var(--dur-snap) var(--ease-snap);
+}
+.btn:active { background: var(--paper-3); transform: scale(0.97); }
+@media (hover: hover) { .btn:hover { background: var(--paper-3); } }
+/* The visitor's own primary action only (one per view). */
+.btn-accent { background: var(--accent); color: var(--paper); }
+.btn-accent:active { background: color-mix(in oklab, var(--accent) 86%, var(--ink)); }
+@media (hover: hover) { .btn-accent:hover { background: color-mix(in oklab, var(--accent) 86%, var(--ink)); } }
+.btn-quiet { background: transparent; color: var(--ink-2); }
+@media (hover: hover) { .btn-quiet:hover { background: var(--paper-2); } }
+/* Waiting, not broken: paper and quiet ink, never a washed-out accent. */
+.btn:disabled, .btn:disabled:hover, .btn:disabled:active { background: var(--paper-3); color: var(--ink-3); cursor: default; transform: none; }
+
+.link {
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; min-height: 24px;
+  font: 500 0.875rem / 1.4 var(--sans); color: var(--ink-2);
+  text-decoration: underline; text-decoration-color: var(--ink-3); text-underline-offset: 0.18em; text-decoration-thickness: 1px;
+}
+@media (hover: hover) { .link:hover { color: var(--ink); } }
+
+/* Rows: hairlines between, never boxes. The current row is marked in ink. */
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  appearance: none; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  width: 100%; min-height: 44px; padding: 0.7rem 0;
+  border: 0; border-bottom: 1px solid var(--rule); background: none;
+  font: 500 0.9375rem / 1.35 var(--sans); color: var(--ink); text-align: left; text-decoration: none;
+  transition: color var(--dur-snap) var(--ease-snap);
+}
+.row > :first-child { min-width: 0; }
+@media (hover: hover) { .row:hover { text-decoration: underline; text-decoration-color: var(--ink-3); text-underline-offset: 0.2em; } }
+.row[aria-current], .row[aria-pressed='true'] { font-weight: 600; padding-left: 0.65rem; box-shadow: inset 2px 0 0 var(--ink); }
+
+/* Wells: an answer the visitor can pick. Their own pick is the accent. */
+.well {
+  appearance: none; border: 0; cursor: pointer;
+  min-height: 52px; padding: 0.5rem 1rem; border-radius: var(--radius-control);
+  background: var(--paper-2); color: var(--ink); text-align: left;
+  font: 500 0.9375rem / 1.3 var(--sans);
+  transition: background-color var(--dur-snap) var(--ease-snap);
+}
+@media (hover: hover) { .well:hover { background: var(--paper-3); } }
+.well[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); font-weight: 600; }
+
+/* Segmented control: modes and filters are ink, never the accent. */
+.segments { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: var(--radius-control); background: var(--paper-2); }
+.segment {
+  appearance: none; border: 0; cursor: pointer; flex: 1 1 auto;
+  min-height: 44px; padding: 0.35rem 0.75rem; border-radius: var(--radius-segment);
+  background: transparent; color: var(--ink-2);
+  font: 500 0.875rem / 1.2 var(--sans);
+  transition: background-color var(--dur-snap) var(--ease-snap), color var(--dur-snap) var(--ease-snap);
+}
+.segment[aria-pressed='true'] { background: var(--paper); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--rule); }
+
+/* One disclosure: + and −, the glyph kept out of the accessible name. */
+.details > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none; }
+.details > summary::-webkit-details-marker { display: none; }
+.details > summary::after { content: '+'; content: '+' / ''; margin-left: auto; font: 500 1rem var(--sans); color: var(--ink-3); }
+.details[open] > summary::after { content: '−'; content: '−' / ''; }
+
+/* Drawings are ink on paper: invert them in dark mode. */
+:root[data-theme='dark'] .art { filter: invert(1) hue-rotate(180deg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .art { filter: invert(1) hue-rotate(180deg); } }
+
+/* ── Reduced motion: every move becomes instant; travel may become a 160ms fade. ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  :root .motion-fade {
+    transition-property: opacity !important;
+    transition-duration: var(--dur-snap) !important;
+    transition-timing-function: var(--ease-snap) !important;
+  }
+}

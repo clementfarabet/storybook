@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#6d28d9"/>
+  <!-- Open storybook shape -->
+  <path d="M12 44C18 41 26 41 32 44C38 41 46 41 52 44V20C46 17 38 17 32 20C26 17 18 17 12 20V44Z" fill="#fbfaf7" fill-opacity="0.95"/>
+  <path d="M32 20V44" stroke="#e3e0d9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Magic sparkle star above book -->
+  <path d="M32 10L33.5 14L37.5 15.5L33.5 17L32 21L30.5 17L26.5 15.5L30.5 14L32 10Z" fill="#fbbf24"/>
+  <circle cx="45" cy="13" r="2" fill="#ede9fe"/>
+</svg>
