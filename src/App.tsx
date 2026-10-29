@@ -513,7 +513,7 @@ export const App: React.FC = () => {
       {/* Gentle In-App New Story Confirmation Modal (FR4) */}
       {isNewStoryConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--scrim)] backdrop-blur-xs animate-fade-in">
-          <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-6 max-w-md w-full shadow-xl space-y-4">
+          <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-6 max-w-md w-full shadow-xl space-y-4 animate-modal-card">
             <h3 className="font-serif text-xl font-medium text-[var(--ink)]">
               Start a Brand New Adventure?
             </h3>
@@ -543,7 +543,7 @@ export const App: React.FC = () => {
       {/* Gentle In-App Page Deletion Confirmation Modal */}
       {pageToDelete !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--scrim)] backdrop-blur-xs animate-fade-in">
-          <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-6 max-w-sm w-full shadow-xl space-y-4 text-center">
+          <div className="bg-[var(--paper)] rounded-2xl border border-[var(--rule)] p-6 max-w-sm w-full shadow-xl space-y-4 text-center animate-modal-card">
             <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center bg-rose-500/10 text-rose-600">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -622,7 +622,7 @@ export const App: React.FC = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-[var(--ink)] text-[var(--paper)] text-xs font-medium shadow-lg backdrop-blur-md animate-fade-in">
+        <div className="fixed bottom-4 left-1/2 z-50 px-4 py-2 rounded-full bg-[var(--ink)] text-[var(--paper)] text-xs font-medium shadow-lg backdrop-blur-md animate-toast">
           {toastMessage}
         </div>
       )}

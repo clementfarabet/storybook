@@ -278,4 +278,117 @@ test('Audio Transcription: cumulative transcript aggregation preserves all spoke
   assert.equal(t3, 'Once upon a time in the quiet woods a little dragon arrived');
 });
 
+// Test 10: Gemini Live API Ephemeral Token Endpoint
+test('Gemini Live API: /storybook/api/live-token creates ephemeral token for gemini-3.5-transcribe-live', async () => {
+  const res = await fetch('http://127.0.0.1:8794/storybook/api/live-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.success, true);
+  assert.equal(data.model, 'gemini-3.5-transcribe-live');
+  assert.ok(typeof data.token === 'string' && data.token.startsWith('auth_tokens/'), 'Token has valid auth_tokens prefix');
+});
+
+// Test 11: Audio Downsampling to 16kHz PCM Int16 and Base64 Encoding
+test('Gemini Live Audio: downsamples browser audio to 16kHz 16-bit PCM and encodes to base64', () => {
+  function downsampleTo16kHz(input, inputSampleRate) {
+    if (inputSampleRate === 16000) {
+      const output = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        output[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return output;
+    }
+
+    const ratio = inputSampleRate / 16000;
+    const newLength = Math.round(input.length / ratio);
+    const output = new Int16Array(newLength);
+    let offsetResult = 0;
+    let offsetInput = 0;
+
+    while (offsetResult < newLength) {
+      const nextOffsetInput = Math.round((offsetResult + 1) * ratio);
+      let accum = 0;
+      let count = 0;
+      for (let i = offsetInput; i < nextOffsetInput && i < input.length; i++) {
+        accum += input[i];
+        count++;
+      }
+      const sample = count > 0 ? accum / count : (input[offsetInput] || 0);
+      const clamped = Math.max(-1, Math.min(1, sample));
+      output[offsetResult] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+      offsetResult++;
+      offsetInput = nextOffsetInput;
+    }
+
+    return output;
+  }
+
+  function int16ToBase64(int16Array) {
+    const bytes = new Uint8Array(int16Array.buffer, int16Array.byteOffset, int16Array.byteLength);
+    let binary = '';
+    const len = bytes.byteLength;
+    const chunkSize = 8192;
+    for (let i = 0; i < len; i += chunkSize) {
+      const slice = bytes.subarray(i, Math.min(i + chunkSize, len));
+      binary += String.fromCharCode.apply(null, slice);
+    }
+    return Buffer.from(binary, 'binary').toString('base64');
+  }
+
+  // Generate 48kHz input (4800 samples = 100ms)
+  const input48k = new Float32Array(4800);
+  for (let i = 0; i < 4800; i++) {
+    input48k[i] = Math.sin(2 * Math.PI * 440 * (i / 48000));
+  }
+
+  const pcm16 = downsampleTo16kHz(input48k, 48000);
+  // 100ms at 16kHz = exactly 1600 samples
+  assert.equal(pcm16.length, 1600, 'Downsampled from 48kHz to exactly 1600 samples at 16kHz');
+
+  // Verify base64 encoding produces valid base64 with expected 3200 bytes (1600 samples * 2 bytes)
+  const b64 = int16ToBase64(pcm16);
+  assert.ok(typeof b64 === 'string' && b64.length > 0);
+  const decodedBytes = Buffer.from(b64, 'base64');
+  assert.equal(decodedBytes.length, 3200, 'Base64 decodes back to exact 3200 PCM bytes');
+});
+
+// Test 12: Live Transcription Stream State machine merges interim and finalized turns
+test('Gemini Live API: stream state merges interim hypotheses and commits finalized segments', () => {
+  let accumulatedText = '';
+  let interimText = '';
+
+  const processMessage = (serverContent) => {
+    if (serverContent.interimInputTranscription?.text) {
+      interimText = serverContent.interimInputTranscription.text.trim();
+    }
+    if (serverContent.inputTranscription?.text) {
+      const finalSeg = serverContent.inputTranscription.text.trim();
+      if (finalSeg) {
+        accumulatedText = [accumulatedText, finalSeg].filter(Boolean).join(' ').trim();
+        interimText = '';
+      }
+    }
+    return [accumulatedText, interimText].filter(Boolean).join(' ').trim();
+  };
+
+  // Turn 1 interim
+  assert.equal(processMessage({ interimInputTranscription: { text: 'The tiny puppy' } }), 'The tiny puppy');
+  assert.equal(processMessage({ interimInputTranscription: { text: 'The tiny puppy found' } }), 'The tiny puppy found');
+
+  // Turn 1 final
+  assert.equal(processMessage({ inputTranscription: { text: 'The tiny puppy found a ball.' } }), 'The tiny puppy found a ball.');
+
+  // Turn 2 interim
+  assert.equal(processMessage({ interimInputTranscription: { text: 'He hopped' } }), 'The tiny puppy found a ball. He hopped');
+
+  // Finish and create page: merges trailing interim if final packet not yet received
+  const stopAndGenerateText = [accumulatedText, interimText].filter(Boolean).join(' ').trim();
+  assert.equal(stopAndGenerateText, 'The tiny puppy found a ball. He hopped');
+});
+
+
 

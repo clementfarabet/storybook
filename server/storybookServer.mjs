@@ -533,6 +533,43 @@ Return ONLY the updated illustration prompt as plain text. No quotes, no markdow
     return;
   }
 
+  // 5. Ephemeral Token for Gemini Live API Streaming Transcription (gemini-3.5-transcribe-live)
+  if ((pathname === '/storybook/api/live-token' || pathname === '/api/live-token') && req.method === 'POST') {
+    try {
+      if (!GEMINI_API_KEY) {
+        sendJson(res, 500, { error: 'Server GEMINI_API_KEY is not configured' });
+        return;
+      }
+      const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const token = await ai.authTokens.create({
+        config: {
+          uses: 2,
+          expireTime,
+          newSessionExpireTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          liveConnectConstraints: {
+            model: 'gemini-3.5-transcribe-live',
+            config: {
+              responseModalities: ['TEXT'],
+              inputAudioTranscription: {
+                languageCodes: [],
+              },
+            },
+          },
+        },
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        token: token.name,
+        model: 'gemini-3.5-transcribe-live',
+      });
+    } catch (err) {
+      console.error('[Storybook Server] live-token error:', err);
+      sendJson(res, 500, { error: err.message || 'Failed to create ephemeral live token' });
+    }
+    return;
+  }
+
   // 404
   sendJson(res, 404, { error: 'Not found' });
 });
