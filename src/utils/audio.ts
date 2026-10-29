@@ -1,6 +1,45 @@
 // Gemini Live API Streaming Transcription and Audio Utilities
 import { GoogleGenAI, Modality } from '@google/genai';
 
+// Cache ephemeral token to eliminate handshake latency on button tap
+let cachedLiveToken: string | null = null;
+let tokenExpiresAt = 0;
+
+export async function fetchLiveToken(): Promise<string> {
+  const res = await fetch('/storybook/api/live-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to get live token (HTTP ${res.status})`);
+  }
+  const data = await res.json();
+  if (!data.token) {
+    throw new Error(data.error || 'Server did not return a live token');
+  }
+  return data.token;
+}
+
+export async function prefetchLiveToken(): Promise<void> {
+  try {
+    const token = await fetchLiveToken();
+    cachedLiveToken = token;
+    tokenExpiresAt = Date.now() + 4 * 60 * 1000;
+  } catch (err) {
+    console.warn('[Live Audio] Prefetch token notice:', err);
+  }
+}
+
+export async function getLiveToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedLiveToken && now < tokenExpiresAt) {
+    const t = cachedLiveToken;
+    cachedLiveToken = null;
+    return t;
+  }
+  return fetchLiveToken();
+}
+
 // Downsample Float32Array PCM from browser sampleRate to 16000Hz 16-bit signed PCM (little-endian)
 export function downsampleTo16kHz(input: Float32Array, inputSampleRate: number): Int16Array {
   if (inputSampleRate === 16000) {
@@ -49,22 +88,6 @@ export function int16ToBase64(int16Array: Int16Array): string {
   return btoa(binary);
 }
 
-// Fetch ephemeral token from server for Gemini Live API transcription
-export async function fetchLiveToken(): Promise<string> {
-  const res = await fetch('/storybook/api/live-token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to get live token (HTTP ${res.status})`);
-  }
-  const data = await res.json();
-  if (!data.token) {
-    throw new Error(data.error || 'Server did not return a live token');
-  }
-  return data.token;
-}
-
 export class LiveAudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
@@ -79,6 +102,7 @@ export class LiveAudioRecorder {
   private accumulatedText = '';
   private interimText = '';
   private isLiveConnected = false;
+  private pendingChunks: string[] = [];
 
   public isRecording = false;
 
@@ -99,6 +123,7 @@ export class LiveAudioRecorder {
       this.accumulatedText = (initialText || '').trim();
       this.interimText = '';
       this.audioChunks = [];
+      this.pendingChunks = [];
       this.isLiveConnected = false;
 
       // 1. Microphone access
@@ -125,7 +150,7 @@ export class LiveAudioRecorder {
       const inputSampleRate = this.audioContext.sampleRate;
       const source = this.audioContext.createMediaStreamSource(this.stream);
 
-      // Level meter
+      // Level meter via Analyser
       if (onAudioLevel) {
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 64;
@@ -149,69 +174,7 @@ export class LiveAudioRecorder {
         checkLevel();
       }
 
-      // 3. Connect to Gemini Live API with ephemeral token
-      let sessionEstablished = false;
-      try {
-        const token = await fetchLiveToken();
-        const ai = new GoogleGenAI({
-          apiKey: token,
-          httpOptions: { apiVersion: 'v1alpha' },
-        });
-
-        const session = await ai.live.connect({
-          model: 'gemini-3.5-transcribe-live',
-          config: {
-            responseModalities: [Modality.TEXT],
-            inputAudioTranscription: {
-              languageCodes: [],
-            },
-          },
-          callbacks: {
-            onopen: () => {
-              console.log('[Live Audio] Connected to Gemini Live Transcription session');
-              this.isLiveConnected = true;
-            },
-            onmessage: (msg: any) => {
-              const content = msg?.serverContent;
-              if (!content) return;
-
-              // Interim hypothesis
-              if (content.interimInputTranscription?.text) {
-                this.interimText = content.interimInputTranscription.text.trim();
-                const combined = [this.accumulatedText, this.interimText].filter(Boolean).join(' ').trim();
-                if (combined) {
-                  onTranscript(combined, false);
-                }
-              }
-
-              // Finalized segment
-              if (content.inputTranscription?.text) {
-                const finalSegment = content.inputTranscription.text.trim();
-                if (finalSegment) {
-                  this.accumulatedText = [this.accumulatedText, finalSegment].filter(Boolean).join(' ').trim();
-                  this.interimText = '';
-                  onTranscript(this.accumulatedText, true);
-                }
-              }
-            },
-            onerror: (err: any) => {
-              console.warn('[Live Audio] Gemini Live transcription error:', err);
-            },
-            onclose: (close: any) => {
-              console.log('[Live Audio] Gemini Live session closed:', close?.code, close?.reason);
-              this.isLiveConnected = false;
-              if (onEnd) onEnd();
-            },
-          },
-        });
-
-        this.liveSession = session;
-        sessionEstablished = true;
-      } catch (liveErr) {
-        console.warn('[Live Audio] Gemini Live connection failed, will use server transcription fallback:', liveErr);
-      }
-
-      // 4. Audio processor for 16kHz PCM streaming
+      // 3. Audio processor for 16kHz PCM streaming (bufferSize 4096 gives ~85-92ms chunks)
       const bufferSize = 4096;
       this.scriptProcessor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
       this.silentGain = this.audioContext.createGain();
@@ -220,12 +183,35 @@ export class LiveAudioRecorder {
       this.scriptProcessor.onaudioprocess = (e: AudioProcessingEvent) => {
         if (!this.isRecording) return;
         const inputData = e.inputBuffer.getChannelData(0);
+
+        // Backup volume calculation directly from audio buffer
+        if (onAudioLevel && !this.analyser) {
+          let sumSquares = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sumSquares += inputData[i] * inputData[i];
+          }
+          const rms = Math.sqrt(sumSquares / inputData.length);
+          onAudioLevel(Math.min(1, rms * 5));
+        }
+
         const pcm16 = downsampleTo16kHz(inputData, inputSampleRate);
         if (pcm16.length === 0) return;
+        const base64Chunk = int16ToBase64(pcm16);
 
         if (this.liveSession && this.isLiveConnected) {
+          // Flush any startup buffered chunks
+          if (this.pendingChunks.length > 0) {
+            for (const pending of this.pendingChunks) {
+              try {
+                this.liveSession.sendRealtimeInput({
+                  audio: { data: pending, mimeType: 'audio/pcm;rate=16000' },
+                });
+              } catch (_) {}
+            }
+            this.pendingChunks = [];
+          }
+
           try {
-            const base64Chunk = int16ToBase64(pcm16);
             this.liveSession.sendRealtimeInput({
               audio: {
                 data: base64Chunk,
@@ -235,6 +221,11 @@ export class LiveAudioRecorder {
           } catch (sendErr) {
             console.warn('[Live Audio] sendRealtimeInput error:', sendErr);
           }
+        } else {
+          // Buffer initial audio chunks during WebSocket handshake (up to 3 seconds)
+          if (this.pendingChunks.length < 35) {
+            this.pendingChunks.push(base64Chunk);
+          }
         }
       };
 
@@ -242,7 +233,7 @@ export class LiveAudioRecorder {
       this.scriptProcessor.connect(this.silentGain);
       this.silentGain.connect(this.audioContext.destination);
 
-      // 5. Parallel MediaRecorder for fallback and audio payload archiving
+      // 4. Parallel MediaRecorder for fallback and audio payload archiving
       try {
         const mimeTypes = [
           'audio/webm;codecs=opus',
@@ -269,6 +260,79 @@ export class LiveAudioRecorder {
       }
 
       this.isRecording = true;
+
+      // 5. Connect to Gemini Live API with ephemeral token
+      try {
+        const token = await getLiveToken();
+        const ai = new GoogleGenAI({
+          apiKey: token,
+          httpOptions: { apiVersion: 'v1alpha' },
+        });
+
+        const session = await ai.live.connect({
+          model: 'gemini-3.5-transcribe-live',
+          config: {
+            responseModalities: [Modality.TEXT],
+            inputAudioTranscription: {
+              languageCodes: [],
+            },
+          },
+          callbacks: {
+            onopen: () => {
+              console.log('[Live Audio] Connected to Gemini Live Transcription session');
+              this.isLiveConnected = true;
+            },
+            onmessage: (msg: any) => {
+              const content = msg?.serverContent || msg?.server_content;
+              if (!content) return;
+
+              // Interim hypothesis (streaming live updates)
+              const interim = content.interimInputTranscription?.text ?? content.interim_input_transcription?.text;
+              if (typeof interim === 'string') {
+                this.interimText = interim.trim();
+                const combined = [this.accumulatedText, this.interimText].filter(Boolean).join(' ').trim();
+                if (combined) {
+                  onTranscript(combined, false);
+                }
+              }
+
+              // Finalized segment
+              const finalSegment = content.inputTranscription?.text ?? content.input_transcription?.text;
+              if (typeof finalSegment === 'string' && finalSegment.trim()) {
+                this.accumulatedText = [this.accumulatedText, finalSegment.trim()].filter(Boolean).join(' ').trim();
+                this.interimText = '';
+                onTranscript(this.accumulatedText, true);
+              }
+            },
+            onerror: (err: any) => {
+              console.warn('[Live Audio] Gemini Live transcription error:', err);
+            },
+            onclose: (close: any) => {
+              console.log('[Live Audio] Gemini Live session closed:', close?.code, close?.reason);
+              this.isLiveConnected = false;
+              if (onEnd) onEnd();
+            },
+          },
+        });
+
+        this.liveSession = session;
+        this.isLiveConnected = true;
+
+        // Immediately flush any startup buffered chunks
+        if (this.pendingChunks.length > 0 && this.isRecording) {
+          for (const pending of this.pendingChunks) {
+            try {
+              this.liveSession.sendRealtimeInput({
+                audio: { data: pending, mimeType: 'audio/pcm;rate=16000' },
+              });
+            } catch (_) {}
+          }
+          this.pendingChunks = [];
+        }
+      } catch (liveErr) {
+        console.warn('[Live Audio] Gemini Live connection failed, will use server transcription fallback:', liveErr);
+      }
+
       return true;
     } catch (err: any) {
       console.error('Failed to access microphone or start live session:', err);
@@ -331,6 +395,7 @@ export class LiveAudioRecorder {
       this.liveSession = null;
     }
     this.isLiveConnected = false;
+    this.pendingChunks = [];
 
     // 4. Resolve final transcript (merging accumulated text and any trailing interim)
     let finalTranscript = [this.accumulatedText, this.interimText].filter(Boolean).join(' ').trim();
