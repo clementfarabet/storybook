@@ -254,11 +254,11 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
       {/* Studio Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--rule)] pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-mono uppercase tracking-wider text-[var(--ink-3)]">
               Page {pageNumber} · Creative Studio
             </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium font-sans px-2 py-0.5 rounded-full border border-[var(--rule)] bg-[var(--paper-2)] text-[var(--ink-2)]">
+            <span className="inline-flex items-center gap-1 text-xs font-medium font-sans px-2.5 py-0.5 rounded-full border border-[var(--rule)] bg-[var(--paper-2)] text-[var(--ink-2)]">
               <Zap className="w-3 h-3 text-[var(--accent)]" />
               Gemini Live Transcribe
             </span>
@@ -326,7 +326,7 @@ export const NarrationStudio: React.FC<NarrationStudioProps> = ({
             {isBusy ? (
               <>
                 <div className="w-7 h-7 border-3 border-current border-t-transparent rounded-full animate-spin text-[var(--accent)]" />
-                <span className="text-[10px] font-semibold mt-1 uppercase tracking-wide text-[var(--ink-2)]">
+                <span className="text-xs font-semibold mt-1 uppercase tracking-wide text-[var(--ink-2)]">
                   Creating…
                 </span>
               </>

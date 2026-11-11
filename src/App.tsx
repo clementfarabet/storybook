@@ -401,9 +401,9 @@ export const App: React.FC = () => {
       {/* Hero Title & Status Banner */}
       <section className="border-b" style={{ borderColor: 'var(--rule)' }}>
         <div className={`w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-3 transition-[max-width] duration-300 ${viewMode === 'read' ? 'max-w-[1480px]' : 'max-w-6xl'}`}>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0 max-w-full">
             <span
-              className="text-xs font-mono uppercase tracking-wider block"
+              className="text-xs font-mono uppercase tracking-wider block break-words"
               style={{ color: 'var(--ink-3)' }}
             >
               CHILDREN'S STORYBOOK MAKER · {book.theme.name.toUpperCase()}
@@ -436,19 +436,19 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-full text-xs font-semibold border transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] max-w-full rounded-full text-xs font-semibold border transition-colors cursor-pointer"
               style={{
                 borderColor: 'var(--rule)',
                 backgroundColor: 'var(--paper-2)',
                 color: 'var(--ink-2)',
               }}
             >
-              <span>{book.theme.badgeEmoji}</span>
-              <span>{book.theme.name}</span>
+              <span className="shrink-0">{book.theme.badgeEmoji}</span>
+              <span className="break-words min-w-0">{book.theme.name}</span>
             </button>
 
             <button
@@ -606,7 +606,7 @@ export const App: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>Storybook · Voice-First AI Children's Book Creator</div>
             <div className="flex items-center gap-3">
-              <a href="/" className="hover:underline">
+              <a href="/" className="min-h-[44px] inline-flex items-center hover:underline">
                 learnandplay.ai
               </a>
             </div>

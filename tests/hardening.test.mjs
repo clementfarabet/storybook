@@ -390,5 +390,21 @@ test('Gemini Live API: stream state merges interim hypotheses and commits finali
   assert.equal(stopAndGenerateText, 'The tiny puppy found a ball. He hopped');
 });
 
+// Test 13: Header learnandplay.ai back-link >=44px target, 200% zoom wrap, btn-accent & landscape scroll guard
+test('WH13: Header & masthead render >=44px learnandplay.ai links, 200% zoom flex-wrap, btn-accent, and scrollable drawer', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const headerSrc = fs.readFileSync(path.resolve(import.meta.dirname, '../src/components/Header.tsx'), 'utf8');
+  const appSrc = fs.readFileSync(path.resolve(import.meta.dirname, '../src/App.tsx'), 'utf8');
+  assert.match(headerSrc, /href="\/"/, 'Header must link back to / (learnandplay.ai hub)');
+  assert.match(headerSrc, /min-h-\[44px\][\s\S]{0,120}learnandplay\.ai/, 'Top learnandplay.ai link must have min-h-[44px]');
+  assert.match(headerSrc, /aria-label="View selector"[\s\S]{0,160}flex-wrap/, 'Header View selector pill must flex-wrap at 200% font size');
+  assert.match(headerSrc, /isSidebarOpen\s*\?\s*['"][^'"]*btn-accent/, 'Active Theme & Age header button must carry btn-accent');
+  assert.match(headerSrc, /role="dialog"[\s\S]{0,180}overflow-y-auto/, 'Mobile options drawer must scroll vertically in landscape');
+  assert.match(appSrc, /flex flex-wrap items-center gap-2 max-w-full/, 'Hero theme/age masthead pills must flex-wrap at 320px 200% zoom');
+  assert.match(appSrc, /<a href="\/" className="min-h-\[44px\] inline-flex items-center hover:underline">/, 'Footer learnandplay.ai link must have min-h-[44px]');
+});
+
+
 
 

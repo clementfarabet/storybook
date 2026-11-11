@@ -29,9 +29,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-[var(--paper)]/95 backdrop-blur-md border-b border-[var(--rule)] transition-colors w-full">
-      <div className="w-full max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-3">
+      <div className="w-full max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         {/* Left: Brand Identity */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="order-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
           <button
             type="button"
             onClick={() => onSelectViewMode('read')}
@@ -39,27 +39,27 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Storybook
           </button>
-          <span className="text-xs text-[var(--ink-3)]">·</span>
+          <span className="text-xs text-[var(--ink-3)]" aria-hidden="true">·</span>
           <a
             href="/"
-            className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline transition-colors"
+            className="min-h-[44px] inline-flex items-center text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline transition-colors"
           >
             learnandplay.ai
           </a>
         </div>
 
         {/* Center: Segmented Navigation Pill (Read Book vs Narrate Studio) */}
-        <div className="flex justify-center shrink-0">
+        <div className="order-3 sm:order-2 w-full sm:w-auto flex justify-center sm:shrink-0 min-w-0 max-w-full">
           <nav
             role="group"
             aria-label="View selector"
-            className="inline-flex items-center rounded-full p-1 border border-[var(--rule)] bg-[var(--paper-2)]"
+            className="w-full sm:w-auto max-w-full inline-flex flex-wrap items-center rounded-2xl sm:rounded-full p-1 border border-[var(--rule)] bg-[var(--paper-2)]"
           >
             <button
               type="button"
               onClick={() => onSelectViewMode('read')}
               aria-pressed={viewMode === 'read'}
-              className="min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial justify-center min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               style={
                 viewMode === 'read'
                   ? { backgroundColor: 'var(--ink)', color: 'var(--paper)' }
@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => onSelectViewMode('narrate')}
               aria-pressed={viewMode === 'narrate'}
-              className="min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial justify-center min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               style={
                 viewMode === 'narrate'
                   ? { backgroundColor: 'var(--ink)', color: 'var(--paper)' }
@@ -98,14 +98,14 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Desktop: Pill Actions */}
-        <div className="hidden md:flex items-center gap-2 shrink-0">
+        <div className="hidden lg:flex lg:order-3 items-center gap-2 shrink-0">
           {/* Theme & Age pill button */}
           <button
             type="button"
             onClick={onOpenSidebar}
             className={`min-h-[44px] min-w-[44px] px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
               isSidebarOpen
-                ? 'bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)]'
+                ? 'btn-accent bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)]'
                 : 'bg-[var(--paper-2)] text-[var(--ink)] border-[var(--rule)] hover:bg-[var(--paper-3)]'
             }`}
             title="Book theme and age group settings"
@@ -154,8 +154,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Right Mobile: Menu Button */}
-        <div className="flex md:hidden items-center gap-1.5 shrink-0">
+        {/* Right Mobile/Tablet: Menu Button */}
+        <div className="order-2 sm:order-3 flex lg:hidden items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -169,15 +169,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile Options Drawer Panel */}
+      {/* Mobile/Tablet Options Drawer Panel */}
       {isMobileMenuOpen && (
         <div
           role="dialog"
           aria-label="Storybook Options Menu"
-          className="md:hidden border-t border-[var(--rule)] bg-[var(--paper)] px-4 py-4 space-y-3 shadow-xl transition-all"
+          className="lg:hidden max-h-[calc(100dvh-8.5rem)] sm:max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-[var(--rule)] bg-[var(--paper)] px-4 py-4 space-y-3 shadow-xl transition-colors"
         >
           <div className="space-y-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-3)] block">
+            <span className="text-xs font-mono uppercase tracking-wider text-[var(--ink-3)] block">
               Story Actions
             </span>
 
@@ -188,13 +188,13 @@ export const Header: React.FC<HeaderProps> = ({
                 setIsMobileMenuOpen(false);
                 onOpenSidebar();
               }}
-              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-2)] hover:bg-[var(--paper-3)] text-[var(--ink)] text-xs font-semibold flex items-center justify-between transition cursor-pointer"
+              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-2)] hover:bg-[var(--paper-3)] text-[var(--ink)] text-xs font-semibold flex flex-wrap items-center justify-between gap-2 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-base">{book.theme.badgeEmoji}</span>
-                <span>Theme: {book.theme.name}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base shrink-0">{book.theme.badgeEmoji}</span>
+                <span className="break-words min-w-0 text-left">Theme: {book.theme.name}</span>
               </div>
-              <span className="text-[11px] text-[var(--accent)] font-medium">Change &rarr;</span>
+              <span className="text-xs text-[var(--accent)] font-medium shrink-0">Change &rarr;</span>
             </button>
 
             {/* Export PDF */}
@@ -227,7 +227,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          <div className="pt-3 border-t border-[var(--rule)] flex items-center justify-between">
+          <div className="pt-3 border-t border-[var(--rule)] flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
               onClick={onToggleTheme}

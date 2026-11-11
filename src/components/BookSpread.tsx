@@ -133,7 +133,7 @@ export const BookSpread: React.FC<BookSpreadProps> = ({
         <button
           type="button"
           onClick={onOpenNarrationStudio}
-          className="mt-2 py-3 px-6 rounded-xl font-medium text-sm bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95 shadow-xs transition-opacity flex items-center gap-2"
+          className="btn-accent mt-2 min-h-[44px] py-3 px-6 rounded-xl font-medium text-sm bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95 shadow-xs transition-opacity flex items-center gap-2 cursor-pointer"
         >
           <Sparkles className="w-4 h-4" />
           <span>Narrate First Page</span>
